@@ -1,18 +1,47 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.utils.keyboard import ReplyKeyboardBuilder
+
+kb = [
+    {"text": "Магазин", "command": "shop", "description": "Магазин"},
+    {"text": "Сервис", "command": "service", "description": "Сервис"},
+    {"text": "Варианты оплаты", "command": "payment", "description": "Варианты оплаты"},
+    {"text": "Варианты доставки", "command": "shipping", "description": "Варианты доставки"},
+    {"text": "О нас\\!", "command": "about", "description": "О нас\\!"},
+]
 
 start_kb = ReplyKeyboardMarkup(
     keyboard=[
         [
             KeyboardButton(text="Магазин"),
             KeyboardButton(text="Сервис"),
-   
-         ]
-         ,[
+
+        ], [
             KeyboardButton(text="Оплата"),
             KeyboardButton(text="Доставка"),
             KeyboardButton(text="О нас!"),
-         ]
+        ]
     ],
-    resize_keyboard=True, 
+    resize_keyboard=True,
     input_field_placeholder="Что вас интересует?"
 )
+
+
+def get_keyboard(
+    *btns: str,
+    placeholder: int = None,
+    request_contact: int = None,
+    request_location: int = None,
+    sizes: tuple[int] = (2,),
+):
+    keyboard = ReplyKeyboardBuilder()
+
+    for index, text in enumerate(btns, start=0):
+        if request_contact and request_contact == index:
+            keyboard.add(KeyboardButton(text=text, request_contact=True))
+
+        elif request_location and request_location == index:
+            keyboard.add(KeyboardButton(text=text, request_location=True))
+        else:
+            keyboard.add(KeyboardButton(text=text))
+
+    return keyboard.adjust(*sizes).as_markup(resize_keyboard=True, input_field_placeholder=placeholder)
