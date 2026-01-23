@@ -28,7 +28,7 @@ start_kb = ReplyKeyboardMarkup(
 
 def get_keyboard(
     *btns: str,
-    placeholder: int = None,
+    placeholder: str = None,
     request_contact: int = None,
     request_location: int = None,
     sizes: tuple[int] = (2,),
