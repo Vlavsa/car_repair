@@ -41,6 +41,7 @@ async def magic_filters(message: types.Message):
     await message.answer('Категории: ')
 
 
+
 @user_router.message((F.text.lower().contains('работа')) | (F.text.lower().contains('сервис')) | (F.text.lower().contains('услуги')))
 @user_router.message(Command('service'))
 async def menu_service(message: types.Message, session: AsyncSession):
@@ -60,6 +61,8 @@ async def menu_service(message: types.Message, session: AsyncSession):
             )
         )
     await message.answer('Сервис: ')
+
+
 
 
 @user_router.message(F.text.lower().contains('оплат') | F.text.lower().contains('cash'))
