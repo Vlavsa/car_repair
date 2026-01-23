@@ -2,6 +2,8 @@ from string import punctuation
 
 from aiogram import F, types, Router, Bot
 from aiogram.filters import Command
+from aiogram.filters.chat_member_updated import ChatMemberUpdatedFilter, IS_NOT_MEMBER, ADMINISTRATOR
+
 
 
 from filters.filters_type import ChatTypeFilter
@@ -10,19 +12,16 @@ from commands.restricted_words import restricted_words
 
 user_group_router = Router()
 user_group_router.message.filter(ChatTypeFilter(['group', 'supergroup']))
-user_group_router.edited_message.filter(ChatTypeFilter(['group', 'supergroup']))
-
-
-
+user_group_router.edited_message.filter(
+    ChatTypeFilter(['group', 'supergroup']))
 
 
 @user_group_router.message(Command("admin"))
 async def get_admins(message: types.Message, bot: Bot):
     chat_id = message.chat.id
     admins_list = await bot.get_chat_administrators(chat_id)
-    #просмотреть все данные и свойства полученных объектов
+    # просмотреть все данные и свойства полученных объектов
     # print(admins_list)
-    # Код ниже это генератор списка, как и этот x = [i for i in range(10)]
     admins_list = [
         member.user.id
         for member in admins_list
@@ -32,6 +31,7 @@ async def get_admins(message: types.Message, bot: Bot):
     if message.from_user.id in admins_list:
         await message.delete()
     # print(admins_list)
+
 
 
 def clean_text(text: str):
