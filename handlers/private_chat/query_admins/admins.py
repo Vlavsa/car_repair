@@ -16,11 +16,12 @@ admin_router = Router()
 admin_router.message.filter(ChatTypeFilter(["private"]), IsAdmin())
 
 
+@admin_router.message(Command("admin"))
+async def admin_features(message: types.Message):
+    await message.answer("Что хотите сделать?", reply_markup=ADMIN_KB)
+
+
 admin_router.include_routers(
     service_router_for_admin,
 )
 
-
-@admin_router.message(Command("admin"))
-async def admin_features(message: types.Message):
-    await message.answer("Что хотите сделать?", reply_markup=ADMIN_KB)
