@@ -5,7 +5,7 @@ from aiogram.fsm.state import StatesGroup, State
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-from database.orm_query import orm_get_services
+from database.Service import orm_get_services
 from filters.chat_type import ChatTypeFilter
 # Italic, as_numbered_list и тд
 from aiogram.utils.formatting import as_list, as_marked_section, Bold

@@ -1,4 +1,4 @@
-from sqlalchemy import DateTime, String, Text, Float, func
+from sqlalchemy import DateTime, String, Text, Float, func, Numeric
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
@@ -12,7 +12,7 @@ class Services(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     description: Mapped[str] = mapped_column(Text)
-    price: Mapped[float] = mapped_column(Float(asdecimal=True), nullable=False)
+    price: Mapped[float] = mapped_column(Numeric(5,2), nullable=False)
     image: Mapped[str] = mapped_column(String(150))
 
 
