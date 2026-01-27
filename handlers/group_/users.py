@@ -6,7 +6,7 @@ from aiogram.filters.chat_member_updated import ChatMemberUpdatedFilter, IS_NOT_
 
 
 
-from filters.filters_type import ChatTypeFilter
+from filters.chat_type import ChatTypeFilter
 
 from commands.restricted_words import restricted_words
 

@@ -6,14 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from database.orm_query import orm_get_services
-from filters.filters_type import ChatTypeFilter
+from filters.chat_type import ChatTypeFilter
 # Italic, as_numbered_list и тд
 from aiogram.utils.formatting import as_list, as_marked_section, Bold
 
 
-from kbds import replay
+from kbds import reply
 from kbds.inline import get_callback_btns
-from kbds.replay import kb, get_keyboard
+from kbds.reply import kb, get_keyboard
 
 user_router = Router()
 user_router.message.filter(ChatTypeFilter(['private']))

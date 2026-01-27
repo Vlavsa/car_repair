@@ -1,6 +1,9 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
+
+
+
 kb = [
     {"text": "Магазин", "command": "shop", "description": "Магазин"},
     {"text": "Сервис", "command": "service", "description": "Сервис"},
@@ -8,6 +11,9 @@ kb = [
     {"text": "Варианты доставки", "command": "shipping", "description": "Варианты доставки"},
     {"text": "О нас\\!", "command": "about", "description": "О нас\\!"},
 ]
+
+
+
 
 start_kb = ReplyKeyboardMarkup(
     keyboard=[
@@ -45,3 +51,11 @@ def get_keyboard(
             keyboard.add(KeyboardButton(text=text))
 
     return keyboard.adjust(*sizes).as_markup(resize_keyboard=True, input_field_placeholder=placeholder)
+
+
+ADMIN_KB = get_keyboard(
+    "Добавить услугу",
+    "Ассортимент",
+    placeholder="Выберите действие",
+    sizes=(2,),
+)

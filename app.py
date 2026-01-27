@@ -17,12 +17,12 @@ from database.engine import create_db, drop_db, session_maker
 
 from commands.bot_cmd_list import private as private_user_cmd
 
-from handlers.user_private import user_router
-from handlers.user_group import user_group_router
-from handlers.user_admin import admin_router
+from handlers.private_chat.query_users.users import user_router
+from handlers.group_chat.users import user_group_router
+from handlers.private_chat.query_admins.admins import admin_router
 
 API_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-ALOWED_UPDATES = ['message', 'edited_message', 'callback_query']
+# ALOWED_UPDATES = ['message', 'edited_message', 'callback_query']
 
 
 # Включаем логирование, чтобы не пропустить важные сообщения
