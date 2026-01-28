@@ -11,6 +11,7 @@ from aiogram.filters import CommandStart
 from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
 
+from middlewares.cleanUp import CleanUpMiddleware
 from middlewares.db import DataBaseSession
 
 from database.engine import create_db, drop_db, session_maker
@@ -56,7 +57,8 @@ async def main():
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
-
+    # dp.update.middleware(CleanUpMiddleware()) # Требует доработки
+    
     dp.update.middleware(DataBaseSession(session_pool=session_maker))
 
     await bot.delete_webhook(drop_pending_updates=True)

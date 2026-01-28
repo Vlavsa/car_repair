@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .Service import service_router_for_admin
 
-from filters.chat_type import ChatTypeFilter, IsAdmin
+from filters.chat_types import ChatTypeFilter, IsAdmin
 
 from kbds.reply import get_keyboard, ADMIN_KB
 

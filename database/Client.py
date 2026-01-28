@@ -1,30 +1,18 @@
-from sqlalchemy import DateTime, String, Text, Float, func
+from sqlalchemy import DateTime, String, Text, Float, func, BigInteger
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
 
-from database.models import Base
+from database.models import Base, Client
 
 
-class Client(Base):
-    __tablename__ = 'clients'
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(150), nullable=False)
-    username: Mapped[str] = mapped_column(String(150), nullable=False)
-    phone_number: Mapped[str] = mapped_column(
-        String(20), unique=True, index=True)
-
-
-async def orm_add_client(session: AsyncSession, data: dict):
-
-    obj = Client(
-        name=data["name"],
-        username=data["username"],
-        phone_number=data["phone_number"],
-    )
-    session.add(obj)
-    await session.commit()
+async def orm_add_client(session: AsyncSession, client_id, name, username, phone_number):
+    query = select(Client).where(Client.client_id == client_id)
+    result = await session.execute(query)
+    if result.first() is None:
+        session.add(Client(client_id=client_id, name=name,
+                    username=username, phone_number=phone_number))
+        await session.commit()
 
 
 async def orm_get_client(session: AsyncSession, client_id: int):

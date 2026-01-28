@@ -1,16 +1,10 @@
-from sqlalchemy import DateTime, String, Text, Float, func, Numeric
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import DateTime, String, Text, Float, func, Numeric, ForeignKey
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
 
-from database.models import Base
+from database.models import Base, Category
 
-
-class Category(Base):
-    __tablename__ = ' category'
-
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(150), nullable=False)
 
 
 async def orm_add_category(session: AsyncSession, data: dict):
@@ -21,11 +15,24 @@ async def orm_add_category(session: AsyncSession, data: dict):
     await session.commit()
 
 
+async def orm_create_categories(session: AsyncSession, categories: list):
+    query = select(Category)
+    result = await session.execute(query)
+    if result.first():
+        return
+    session.add_all([Category(name=name) for name in categories]) 
+    await session.commit()
+
+
 async def orm_get_categories(session: AsyncSession):
     query = select(Category)
     result = await session.execute(query)
     return result.scalars().all()
 
+async def orm_get_categories_inner_join_services(session: AsyncSession):
+    query = select(Category).join(Category.services)
+    result = await session.execute(query)
+    return result.scalars().all()
 
 async def orm_get_category(session: AsyncSession, category_id: int):
     query = select(Category).where(Category.id == category_id)
@@ -45,3 +52,5 @@ async def orm_delete_category(session: AsyncSession, category_id: int):
     query = delete(Category).where(Category.id == category_id)
     await session.execute(query)
     await session.commit()
+
+
