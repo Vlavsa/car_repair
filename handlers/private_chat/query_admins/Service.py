@@ -7,7 +7,7 @@ from aiogram.fsm.context import FSMContext
 
 
 from kbds.inline.categories_admin import CategoryClick
-from kbds.inline.inline import get_callback_btns, button_service_admin
+from kbds.inline.inline import get_callback_btns, button_service_admin, button_categories_admin
 from kbds.reply import ADMIN_KB
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,13 +32,13 @@ service_router_for_admin = Router()
 service_router_for_admin.message.filter(ChatTypeFilter(["private"]), IsAdmin())
 
 
-
 @service_router_for_admin.callback_query(F.data == 'prev_category')
 async def prev_menu_2(callback: types.CallbackQuery, session: AsyncSession):
     await callback.answer()
     await callback.message.edit_text(
         text="Настройка категорий:",
-        reply_markup=button_service_admin)
+        reply_markup=button_categories_admin)
+
 
 @service_router_for_admin.message(F.text == 'Ассортимент')
 async def admin_features(message: types.Message, session: AsyncSession):
@@ -51,12 +51,13 @@ async def admin_features(message: types.Message, session: AsyncSession):
 async def starring_at_service(callback: types.CallbackQuery, session: AsyncSession, callback_data: CategoryClick):
     category_id = callback_data.category_id
     query = await orm_get_services_by_category_id(session=session, category_id=int(category_id))
-    if not query or len(query) < 1:
-        await callback.answer()
-        return await callback.message.answer('Список пуст....')
 
     await callback.message.delete()
     await callback.answer()
+
+    if not query or len(query) < 1:
+        await callback.answer()
+        await callback.message.answer('Список пуст....', reply_markup=button_service_admin)
 
     for service in await orm_get_services_by_category_id(session, int(category_id)):
         await callback.message.answer_photo(
@@ -73,8 +74,6 @@ async def starring_at_service(callback: types.CallbackQuery, session: AsyncSessi
         )
     await callback.answer()
     await callback.message.answer("ОК, вот список товаров ⏫", reply_markup=button_service_admin)
-    
-    
 
 
 @service_router_for_admin.callback_query(F.data.startswith("delete_"))
@@ -126,10 +125,10 @@ async def change_service_callback(
 
 
 # Становимся в состояние ожидания ввода name
-@service_router_for_admin.message(StateFilter(None), F.text == "Добавить услугу")
-async def add_service(message: types.Message, state: FSMContext):
-
-    await message.answer(
+@service_router_for_admin.callback_query(F.data == "add_service")
+async def add_service(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await callback.message.answer(
         "Введите название услуги", reply_markup=types.ReplyKeyboardRemove()
     )
     await state.set_state(AddService.name)
