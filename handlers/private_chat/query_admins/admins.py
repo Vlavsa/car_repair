@@ -5,11 +5,14 @@ from aiogram.fsm.context import FSMContext
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .Service import service_router_for_admin
+from handlers.private_chat.query_admins.Service import service_router_for_admin
+from handlers.private_chat.query_admins.Banners import banner_router_for_admin
+from handlers.private_chat.query_admins.Category import category_router_for_admin
 
 from filters.chat_types import ChatTypeFilter, IsAdmin
 
-from kbds.reply import get_keyboard, ADMIN_KB
+from kbds.inline.inline import get_callback_btns, button_categories_admin, button_settings_admin, buttons_start_admin
+from kbds.reply import get_keyboard
 
 
 admin_router = Router()
@@ -17,11 +20,41 @@ admin_router.message.filter(ChatTypeFilter(["private"]), IsAdmin())
 
 
 @admin_router.message(Command("admin"))
-async def admin_features(message: types.Message):
-    await message.answer("Что хотите сделать?", reply_markup=ADMIN_KB)
+async def get_main_menu_admins(message: types.Message):
+    return await message.answer(text="Главное меню админа:", reply_markup=buttons_start_admin)
+
+
+@category_router_for_admin.callback_query(F.data == 'exit')
+async def exit_menu(callback: types.CallbackQuery, session: AsyncSession):
+    await callback.message.delete()
+    await callback.answer()
+    return await callback.message.answer('Буду ждать твоего возвращения!!!', reply_markup=types.ReplyKeyboardRemove())
+
+
+@category_router_for_admin.callback_query(F.data == 'prev_menu')
+async def settings_menu(callback: types.CallbackQuery, session: AsyncSession):
+    await callback.answer()
+    await callback.message.edit_text(
+        text="Главное меню админа:",
+        reply_markup=buttons_start_admin)
+
+
+@category_router_for_admin.callback_query(F.data == 'settings')
+async def settings_menu(callback: types.CallbackQuery, session: AsyncSession):
+    await callback.answer()
+    await callback.message.edit_text(
+        text="Настройки администратора:",
+        reply_markup=button_settings_admin)
+
+
+@category_router_for_admin.callback_query(F.data == 'recording')
+async def recording_menu(callback: types.CallbackQuery, session: AsyncSession):
+    await callback.answer()
+    return await callback.message.answer("Работаю над расписанием))")
 
 
 admin_router.include_routers(
+    banner_router_for_admin,
+    category_router_for_admin,
     service_router_for_admin,
 )
-
