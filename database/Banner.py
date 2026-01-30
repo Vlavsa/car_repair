@@ -3,20 +3,19 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship,
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
 
-from database.models import Base, Banner
+from database.models import Banner
+
 
 
 async def orm_add_banner_description(session: AsyncSession, data: dict):
+    #Добавляем новый или изменяем существующий по именам
+    #пунктов меню: main, about, order, shipping, payment, catalog
     query = select(Banner)
     result = await session.execute(query)
-
     if result.first():
         return
-
-    session.add_all([Banner(name=name, description=description) for name, description in data.items()])
-
+    session.add_all([Banner(name=name, description=description) for name, description in data.items()]) 
     await session.commit()
-
 
 
 async def orm_change_banner_image(session: AsyncSession, name: str, image: str):
