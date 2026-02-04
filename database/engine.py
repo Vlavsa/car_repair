@@ -30,7 +30,7 @@ async def create_db():
 
     async with session_maker() as session:
         await orm_create_categories(session, categories)
-        await orm_add_banner_description(session, description_for_info_pages)
+        await orm_add_banner_description(session, description_for_info_pages) ## Добавляем страницы баннеров
 
 
 # async def drop_db():

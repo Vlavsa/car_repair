@@ -35,6 +35,15 @@ category_router_for_admin.message.filter(
     ChatTypeFilter(["private"]), IsAdmin())
 
 
+class AddCategory(StatesGroup):
+    # Шаги состояний
+    name = State()
+
+    texts = {
+        "AddCategory:name": "Введите название заново:",
+    }
+
+
 @category_router_for_admin.callback_query(F.data == 'categories')
 async def categories_menu(callback: types.CallbackQuery, session: AsyncSession):
     await callback.answer()
@@ -43,16 +52,8 @@ async def categories_menu(callback: types.CallbackQuery, session: AsyncSession):
         reply_markup=button_categories_admin)
 
 
-@category_router_for_admin.callback_query(F.data == 'prev_settings')
-async def prev_menu_2(callback: types.CallbackQuery, session: AsyncSession):
-    await callback.answer()
-    await callback.message.edit_text(
-        text="Настройки администратора:",
-        reply_markup=button_settings_admin)
-
-
 @category_router_for_admin.callback_query(F.data == 'categories_list')
-async def cmd_show_categories(callback: types.CallbackQuery, session: AsyncSession):
+async def cmd_show_categories(callback: types.CallbackQuery, session: AsyncSession, state: FSMContext):
     # 1. Запрос к БД
     categories = await orm_get_categories_with_count_services(session)
 
@@ -66,20 +67,24 @@ async def cmd_show_categories(callback: types.CallbackQuery, session: AsyncSessi
     for row in categories:
         category = row[0]  # Объект Category
         count = row[1]     # Результат count
-        print(category, row)
         # Создаем кнопки именно для этой карточки
         builder = InlineKeyboardBuilder()
         builder.button(
-            text="📖 Список услуг",
+            text="📖 Список",
             callback_data=CategoryClick(
                 action="category_", category_id=category.id)
         )
         builder.button(
-            text="🗑 Удалить категорию",
+            text="🗑 Удалить",
             callback_data=CategoryClick(
                 action="delete", category_id=category.id)
         )
-        builder.adjust(3)  # Кнопки одна под другой
+        builder.button(
+            text="✏️ Редактирать",
+            callback_data=CategoryClick(
+                action="edit", category_id=category.id)
+        )
+        builder.adjust(1, 2)  # Кнопки одна под другой
 
         # Отправляем сообщение-карточку
         await callback.message.answer(
@@ -92,7 +97,7 @@ async def cmd_show_categories(callback: types.CallbackQuery, session: AsyncSessi
             reply_markup=builder.as_markup(),
             parse_mode="Markdown"
         )
-    await callback.message.answer(
+    sent_messages = await callback.message.answer(
         text="Настройки категорий:",
         reply_markup=button_categories_admin)
 
@@ -121,10 +126,30 @@ async def ask_delete_confirmation(callback: types.CallbackQuery, callback_data: 
     await callback.answer()
 
 
+@category_router_for_admin.callback_query(CategoryClick.filter(F.action == 'edit'))
+async def edit_category(
+    callback: types.CallbackQuery,
+    callback_data: CategoryClick,
+    state: FSMContext,  # Добавляем FSM
+    session: AsyncSession
+):
+    # 2. Сохраняем ID категории, которую редактируем
+    await state.update_data(edit_category_id=callback_data.category_id)
+
+    # 3. Устанавливаем состояние ожидания текста
+    await state.set_state(AddCategory.name)
+
+    await callback.message.answer(
+        f"Введите новое название для категории (ID: {callback_data.category_id}):"
+    )
+
+    await callback.answer()
+
+
 @category_router_for_admin.callback_query(CategoryClick.filter(F.action == "confirm_delete"))
 async def delete_category_confirmed(callback: types.CallbackQuery, callback_data: CategoryClick, session: AsyncSession):
-    # Удаление из БД (пример функции)
-    # await orm_delete_category(session, callback_data.category_id)
+    # Удаление из БД
+
     await orm_delete_category(session=session, category_id=callback_data.category_id)
     await session.commit()
 
@@ -134,18 +159,9 @@ async def delete_category_confirmed(callback: types.CallbackQuery, callback_data
 
 @category_router_for_admin.callback_query(CategoryClick.filter(F.action == "cancel"))
 async def cancel_delete(callback: types.CallbackQuery):
-    # Можно либо вернуть меню категорий, либо просто удалить сообщение
+
     await callback.message.delete()
     await callback.answer("Действие отменено")
-
-
-class AddCategory(StatesGroup):
-    # Шаги состояний
-    name = State()
-
-    texts = {
-        "AddCategory:name": "Введите название заново:",
-    }
 
 
 @category_router_for_admin.callback_query(F.data == "add_category")
@@ -155,24 +171,28 @@ async def add_category(callback: types.CallbackQuery, state: FSMContext):
 
 
 @category_router_for_admin.message(AddCategory.name, F.text)
-async def add_name_category(message: types.Message, state: FSMContext, session: AsyncSession):
+async def save_category_logic(message: types.Message, state: FSMContext, session: AsyncSession):
     if len(message.text) <= 3:
-        await message.answer(
-            "Название категории не должно быть меньше 3 символов. \n Введите заново"
-        )
+        await message.answer("Название слишком короткое! Введите заново.")
         return
-    else:
-        await state.update_data(name=message.text)
+
+    data = await state.get_data()
+    category_id = data.get("edit_category_id")
+
+    payload = {"name": message.text}
 
     try:
-        data = await state.get_data()
-        await orm_add_category(session, data)
-        await message.answer("Категория добавлена/изменена", reply_markup=button_categories_admin)
+        if category_id:
+            await orm_update_category(session, category_id, payload)
+            await message.answer(f"✅ Название изменено на: **{message.text}**")
+        else:
+            # ДОБАВЛЕНИЕ
+            await orm_add_category(session, payload)
+            await message.answer("✅ Категория добавлена", reply_markup=button_categories_admin)
+
+        # Финальный коммит, если он не сделан внутри функций
         await state.clear()
 
     except Exception as e:
-        await message.answer(
-            f"Ошибка: \n{str(e)}\nОбратись к Владу, он опять денег хочет",
-            reply_markup=button_categories_admin,
-        )
-        await state.clear()
+        # Если снова будет ошибка, мы увидим, на чем именно споткнулся код
+        await message.answer(f"Ошибка при сохранении: {e}")

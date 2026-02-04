@@ -52,14 +52,14 @@ async def starring_at_service(callback: types.CallbackQuery, session: AsyncSessi
     category_id = callback_data.category_id
     query = await orm_get_services_by_category_id(session=session, category_id=int(category_id))
 
-    await callback.message.delete()
-    await callback.answer()
-
     if not query or len(query) < 1:
         await callback.answer()
         await callback.message.answer('Список пуст....', reply_markup=button_service_admin)
 
-    for service in await orm_get_services_by_category_id(session, int(category_id)):
+    await callback.message.delete()
+    await callback.answer()
+
+    for service in query:
         await callback.message.answer_photo(
             service.image,
             caption=f"<strong>{service.name}\

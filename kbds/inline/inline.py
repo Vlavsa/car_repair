@@ -62,12 +62,18 @@ buttons_start_admin = get_callback_btns(btns={
 
 button_settings_admin = get_callback_btns(btns={
     'Категории': 'categories',
-    'Баннеры': 'bunners_list',
+    'Баннеры': 'banners',
     'Записи': 'recording',
     'Назад': 'prev_menu'
 })
 
 button_service_admin = get_callback_btns(btns={
     'Добавить Услугу': 'add_service',
+    'Назад': 'prev_category'
+})
+
+button_banner_admin = get_callback_btns(btns={
+    'Список баннеров': 'banners_list',
+    # 'Добавить Баннеры': 'add_banners',
     'Назад': 'prev_category'
 })

@@ -4,8 +4,10 @@ from aiogram import F, Router, types
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.filters import Command, StateFilter, or_f
 from aiogram.fsm.context import FSMContext
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
+from callback.banner_admins_btns import BannerClick
 from kbds.inline.inline import get_callback_btns
 from kbds.reply import get_keyboard, ADMIN_KB
 
@@ -14,12 +16,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from filters.chat_types import ChatTypeFilter, IsAdmin
 
 from database.Banner import (
+    orm_get_banners,
     orm_add_banner_description,
     orm_change_banner_image,
     orm_get_banner,
-    orm_get_info_pages
+    orm_get_info_pages,
+    orm_update_banner_image
 )
 
+from kbds.inline.inline import button_banner_admin
 
 
 banner_router_for_admin = Router()
@@ -31,31 +36,109 @@ banner_router_for_admin.message.filter(ChatTypeFilter(["private"]), IsAdmin())
 class AddBanner(StatesGroup):
     image = State()
 
-# Отправляем перечень информационных страниц бота и становимся в состояние отправки photo
-@banner_router_for_admin.message(StateFilter(None), F.text == 'Добавить/Изменить баннер')
-async def add_image2(message: types.Message, state: FSMContext, session: AsyncSession):
-    pages_names = [page.name for page in await orm_get_info_pages(session)]
-    await message.answer(f"Отправьте фото баннера.\nВ описании укажите для какой страницы:\
-                         \n{', '.join(pages_names)}")
+
+@banner_router_for_admin.callback_query(F.data == 'banners')
+async def banners_menu(callback: types.CallbackQuery, session: AsyncSession):
+    await callback.answer()
+    await callback.message.edit_text(
+        text="Настройка баннеров:",
+        reply_markup=button_banner_admin)
+
+
+@banner_router_for_admin.callback_query(F.data == 'banners_list')
+async def cmd_show_banners(callback: types.CallbackQuery, session: AsyncSession, state: FSMContext):
+    # 1. Запрос к БД
+    banners = await orm_get_banners(session)
+
+    if not banners:
+        await callback.answer()
+        return await callback.message.answer('Баннеры еще не добавлены.')
+
+    await callback.message.delete()
+    await callback.answer()
+    for row in banners:
+        builder = InlineKeyboardBuilder()
+        ### Данная затея не рассматривается
+        # builder.button(
+        #     text="🗑 Удалить",
+        #     callback_data=BannerClick(
+        #         action="delete", banner_id=row.id, banner_name=row.name)
+        # )
+        builder.button(
+            text="✏️ Редактирать",
+            callback_data=BannerClick(
+                action="edit", banner_id=row.id, banner_name=row.name)
+        )
+        builder.adjust(2,)  # Кнопки одна под другой
+        if row.image:
+            await callback.message.answer_photo(
+                photo=row.image,
+                reply_markup=builder.as_markup(),
+                parse_mode="Markdown"
+            )
+        else:
+            # Если картинки нет, отправляем просто текст, чтобы бот не падал
+            await callback.message.answer(
+                text=f"🖼 (Изображение отсутствует)\nВаш текст баннера...\n**{row.name}**",
+                reply_markup=builder.as_markup()
+            )
+    await callback.message.answer(text='Настройка Баннеров', reply_markup=button_banner_admin)
+
+
+@banner_router_for_admin.callback_query(BannerClick.filter(F.action == 'edit'))
+async def edit_banner(
+    callback: types.CallbackQuery,
+    callback_data: BannerClick,
+    state: FSMContext,  # Добавляем FSM
+    session: AsyncSession
+):
+    await callback.message.delete()
+    await callback.answer()
+    await state.update_data(edit_banner_id=callback_data.banner_id)
+
     await state.set_state(AddBanner.image)
+    await callback.message.answer(
+        f"Загрузите фотографию для баннера (name: {callback_data.banner_name}):"
+    )
+
+    await callback.answer()
+
+# Отправляем перечень информационных страниц бота и становимся в состояние отправки photo
+# @banner_router_for_admin.message(StateFilter(None), F.text == 'Добавить/Изменить баннер')
+# async def add_image2(message: types.Message, state: FSMContext, session: AsyncSession):
+#     pages_names = [page.name for page in await orm_get_info_pages(session)]
+#     await message.answer(f"Отправьте фото баннера.\nВ описании укажите для какой страницы:\
+#                          \n{', '.join(pages_names)}")
+#     await state.set_state(AddBanner.image)
 
 # Добавляем/изменяем изображение в таблице (там уже есть записанные страницы по именам:
 # main, catalog, cart(для пустой корзины), about, payment, shipping
+
+
 @banner_router_for_admin.message(AddBanner.image, F.photo)
 async def add_banner(message: types.Message, state: FSMContext, session: AsyncSession):
-    image_id = message.photo[-1].file_id
-    for_page = message.caption.strip()
-    pages_names = [page.name for page in await orm_get_info_pages(session)]
-    if for_page not in pages_names:
-        await message.answer(f"Введите нормальное название страницы, например:\
-                         \n{', '.join(pages_names)}")
-        return
-    await orm_change_banner_image(session, for_page, image_id,)
-    await message.answer("Баннер добавлен/изменен.", reply_markup=ADMIN_KB)
-    await state.clear()
+    data = await state.get_data()
+    banner_id = data.get('edit_banner_id')
 
+    try:
+        image_id = message.photo[-1].file_id
+
+        
+        # Обновляем запись по уникальному banner_id (Primary Key)
+        # Это гарантирует изменение ровно одной нужной строки
+        await orm_update_banner_image(
+            session=session, 
+            banner_id=banner_id, 
+            image=image_id,
+        )
+
+        await message.answer("Баннер успешно обновлен.", reply_markup=button_banner_admin)
+        await state.clear()
+    except Exception as e:
+        await message.answer(f"Ошибка при сохранении: {e}")
 # ловим некоррекный ввод
+
+
 @banner_router_for_admin.message(AddBanner.image)
 async def add_banner2(message: types.Message, state: FSMContext):
     await message.answer("Отправьте фото баннера или отмена")
-

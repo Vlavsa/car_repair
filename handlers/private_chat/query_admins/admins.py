@@ -24,22 +24,30 @@ async def get_main_menu_admins(message: types.Message):
     return await message.answer(text="Главное меню админа:", reply_markup=buttons_start_admin)
 
 
-@category_router_for_admin.callback_query(F.data == 'exit')
+@admin_router.callback_query(F.data == 'exit')
 async def exit_menu(callback: types.CallbackQuery, session: AsyncSession):
     await callback.message.delete()
     await callback.answer()
     return await callback.message.answer('Буду ждать твоего возвращения!!!', reply_markup=types.ReplyKeyboardRemove())
 
 
-@category_router_for_admin.callback_query(F.data == 'prev_menu')
+@admin_router.callback_query(F.data == 'prev_menu')
 async def settings_menu(callback: types.CallbackQuery, session: AsyncSession):
     await callback.answer()
     await callback.message.edit_text(
         text="Главное меню админа:",
         reply_markup=buttons_start_admin)
+    
+@admin_router.callback_query(F.data == 'prev_settings')
+async def prev_menu_2(callback: types.CallbackQuery, session: AsyncSession):
+    await callback.answer()
+    await callback.message.edit_text(
+        text="Настройки администратора:",
+        reply_markup=button_settings_admin)
 
 
-@category_router_for_admin.callback_query(F.data == 'settings')
+
+@admin_router.callback_query(F.data == 'settings')
 async def settings_menu(callback: types.CallbackQuery, session: AsyncSession):
     await callback.answer()
     await callback.message.edit_text(
@@ -47,7 +55,7 @@ async def settings_menu(callback: types.CallbackQuery, session: AsyncSession):
         reply_markup=button_settings_admin)
 
 
-@category_router_for_admin.callback_query(F.data == 'recording')
+@admin_router.callback_query(F.data == 'recording')
 async def recording_menu(callback: types.CallbackQuery, session: AsyncSession):
     await callback.answer()
     return await callback.message.answer("Работаю над расписанием))")
