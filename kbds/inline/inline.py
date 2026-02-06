@@ -3,6 +3,9 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import InlineKeyboardButton
 
 
+from kbds.inline.main_menu_client import MenuCallBack
+
+
 def get_callback_btns(
         *,
         btns: dict[str, str],
@@ -15,6 +18,56 @@ def get_callback_btns(
 
     # При нажатии вернет callback_data
     return builder.adjust(*sizes).as_markup()
+
+
+def get_user_catalog_btns(*, level: int, categories: list, sizes: tuple[int] = (2,),):
+    keyboard = InlineKeyboardBuilder()
+
+    keyboard.add(InlineKeyboardButton(text='Назад', callback_data=MenuCallBack(
+        level=level-1, menu_name='main').pack()))
+    keyboard.add(InlineKeyboardButton(
+        text='Корзина', callback_data=MenuCallBack(level=3, menu_name='order').pack()))
+
+    if not categories:
+        return keyboard.adjust(*sizes).as_markup()
+
+    for cat in categories:
+        keyboard.add(InlineKeyboardButton(text=cat.name, callback_data=MenuCallBack(
+            level=level+1, menu_name=cat.name, category=cat.id).pack()))
+
+    return keyboard.adjust(*sizes).as_markup()
+
+
+def get_products_btns(
+    *,
+    level: int,
+    category: int,
+    page: int,
+    pagination_btns: dict,
+    product_id: int,
+    sizes: tuple[int] = (2, 1)
+):
+    keyboard = InlineKeyboardBuilder()
+
+    keyboard.add(InlineKeyboardButton(text='Назад', callback_data=MenuCallBack(
+        level=level-1, menu_name='catalog').pack()))
+    keyboard.add(InlineKeyboardButton(
+        text='Корзина', callback_data=MenuCallBack(level=3, menu_name='order').pack()))
+    keyboard.add(InlineKeyboardButton(text='Выбрать', callback_data=MenuCallBack(
+        level=level, menu_name='add_to_order', product_id=product_id).pack()))
+
+    keyboard.adjust(*sizes)
+
+    row = []
+
+    for text, menu_name in pagination_btns.items():
+        if menu_name == "next":
+            row.append(InlineKeyboardButton(text=text, callback_data=MenuCallBack(
+                level=level, menu_name=menu_name, category=category, page=page + 1).pack()))
+        elif menu_name == "prev":
+            row.append(InlineKeyboardButton(text=text, callback_data=MenuCallBack(level=level, menu_name=menu_name, category=category, page=page - 1).pack()))\
+
+    return keyboard.row(*row).as_markup()
 
 
 def get_url_btns(
@@ -55,7 +108,7 @@ button_categories_admin = get_callback_btns(btns={
 })
 
 buttons_start_admin = get_callback_btns(btns={
-    'Запись': 'recording',
+    'Запись': 'orders',
     'Настройки': 'settings',
     'Выйти': 'exit',
 })
@@ -63,7 +116,7 @@ buttons_start_admin = get_callback_btns(btns={
 button_settings_admin = get_callback_btns(btns={
     'Категории': 'categories',
     'Баннеры': 'banners',
-    'Записи': 'recording',
+    'Расписание': 'recording',
     'Назад': 'prev_menu'
 })
 
@@ -75,5 +128,5 @@ button_service_admin = get_callback_btns(btns={
 button_banner_admin = get_callback_btns(btns={
     'Список баннеров': 'banners_list',
     # 'Добавить Баннеры': 'add_banners',
-    'Назад': 'prev_category'
+    'Назад': 'prev_settings'
 })

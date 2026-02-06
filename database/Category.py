@@ -38,7 +38,7 @@ async def orm_get_category(session: AsyncSession, category_id: int):
 async def orm_get_categories_inner_join_services(session: AsyncSession):
     query = select(Category).join(Category.services)
     result = await session.execute(query)
-    return result.scalars().all()
+    return result.scalars().unique().all()
 
 
 async def orm_get_categories_with_count_services(session: AsyncSession):

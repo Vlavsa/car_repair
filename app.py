@@ -45,7 +45,7 @@ dp.include_router(admin_router)
 
 async def on_startup():
 
-    # await drop_db()
+    await drop_db()
 
     await create_db()
 

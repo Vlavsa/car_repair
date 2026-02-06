@@ -10,7 +10,7 @@ async def orm_add_service(session: AsyncSession, data: dict):
     obj = Service(
         name=data["name"],
         description=data["description"],
-        price=float(data["price"].replace(",", ".")),
+        price=float(data["price"]),
         image=data["image"],
         category_id=int(data['category'])
     )
@@ -18,11 +18,16 @@ async def orm_add_service(session: AsyncSession, data: dict):
     await session.commit()
 
 
-async def orm_get_services_by_category_id(session: AsyncSession, category_id):
+async def orm_get_services_by_category_id(session: AsyncSession, category_id: int):
     query = select(Service).where(Service.category_id == int(category_id))
     result = await session.execute(query)
     return result.scalars().all()
 
+
+async def orm_get_service_prices_by_id(session: AsyncSession, service_id: int):
+    query = select(Service.price).where(Service.id == service_id)
+    result = await session.execute(query)
+    return result.scalar()
 
 async def orm_get_service_by_id(session: AsyncSession, service_id: int):
     query = select(Service).where(Service.id == service_id)

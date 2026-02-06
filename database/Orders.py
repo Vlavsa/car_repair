@@ -1,53 +1,123 @@
+from datetime import datetime
+
 from sqlalchemy import DateTime, String, Text, Float, func, Numeric, ForeignKey
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, joinedload
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, joinedload, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
 
-from database.models import Base, Order
+from database.Service import orm_get_service_prices_by_id
+from database.models import Base, Order, OrderItem
 
 
-async def orm_add_to_order(session: AsyncSession, client_id: int, service_id: int):
-    query = select(Order).where(Order.client_id == client_id,
-                               Order.service_id == service_id).options(joinedload(Order.product))
-    cart = await session.execute(query)
-    cart = cart.scalar()
-    if cart:
-        cart.quantity += 1
-        await session.commit()
-        return cart
+async def orm_add_to_order(
+    session: AsyncSession,
+    client_id: int,
+    service_id: int,
+    status_id: int = None,
+    plan_date: datetime = None,
+    due_date: datetime = None
+):
+    query = select(Order).where(
+        Order.client_id == client_id,
+        Order.status_id == status_id,
+    ).options(selectinload(Order.items))
+
+    result = await session.execute(query)
+    order = result.scalar()
+
+    if not order:
+        order = Order(
+            client_id=client_id,
+            status_id=status_id,
+            plan_date=plan_date,
+            due_date=due_date,
+        )
+
+        session.add(order)
+        await session.flush()
+
+    item_query = select(OrderItem).where(
+        OrderItem.order_id == order.id,
+        OrderItem.service_id == service_id
+    )
+
+    item_result = await session.execute(item_query)
+    item = item_result.scalar()
+
+    if item:
+        item.quantity += 1
     else:
-        session.add(Order(client_id=client_id,
-                    service_id=service_id, quantity=1))
+        servise_to_price = orm_get_service_prices_by_id(session=session, service_id=service_id)
+        print(servise_to_price)
+        # Добавляем новую позицию. Цену берем из модели Service!
+        session.add(OrderItem(
+            order_id=order.id,
+            service_id=service_id,
+            quantity=1,
+            price_at_runtime=0  # Тут лучше подтянуть реальную цену из Service
+        ))
+
+    await session.commit()
+
+
+async def orm_reduce_service_in_order(session: AsyncSession, client_id: int, service_id: int, status_id: int):
+    # Находим нужный айтем через связь с заказом пользователя
+    query = select(OrderItem).join(Order).where(
+        Order.client_id == client_id,
+        Order.status_id == status_id,
+        OrderItem.service_id == service_id
+    )
+
+    result = await session.execute(query)
+    item = result.scalar()
+
+    if not item:
+        return False
+
+    if item.quantity > 1:
+        item.quantity -= 1
         await session.commit()
+        return True
+    else:
+        # Удаляем только одну услугу из заказа
+        await session.delete(item)
+        await session.commit()
+        return False
 
 
-async def orm_get_user_orders(session: AsyncSession, client_id):
-    query = select(Order).filter(Order.client_id ==
-                                client_id).options(joinedload(Order.service))
+async def orm_get_user_orders(session: AsyncSession, client_id: int):
+    query = select(Order).where(Order.client_id == client_id).options(
+        selectinload(Order.items).joinedload(
+            OrderItem.service),  # Грузим айтемы + инфо об услуге
+        joinedload(Order.status)  # Грузим название статуса
+    )
     result = await session.execute(query)
     return result.scalars().all()
 
 
-async def orm_delete_from_order(session: AsyncSession, client_id: int, service_id: int):
-    query = delete(Order).where(Order.client_id == client_id,
-                               Order.service_id == service_id)
+async def orm_update_order_details(
+    session: AsyncSession, 
+    order_id: int, 
+    status_id: int = None, 
+    plan_date: datetime = None, 
+    due_date: datetime = None
+):
+    update_data = {}
+    if status_id is not None:
+        update_data["status_id"] = status_id
+    if plan_date is not None:
+        update_data["plan_date"] = plan_date
+    if due_date is not None:
+        update_data["due_date"] = due_date
+
+    if not update_data:
+        return  # Нечего обновлять
+
+    query = (
+        update(Order)
+        .where(Order.id == order_id)
+        .values(**update_data)
+    )
+    
     await session.execute(query)
     await session.commit()
-
-
-async def orm_reduce_service_in_order(session: AsyncSession, client_id: int, service_id: int):
-    query = select(Order).where(Order.client_id == client_id,
-                               Order.service_id == service_id).options(joinedload(Order.service))
-    cart = await session.execute(query)
-    cart = cart.scalar()
-
-    if not cart:
-        return
-    if cart.quantity > 1:
-        cart.quantity -= 1
-        await session.commit()
-        return True
-    else:
-        await orm_delete_from_order(session, client_id, service_id)
-        await session.commit()
-        return False

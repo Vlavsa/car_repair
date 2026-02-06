@@ -35,6 +35,8 @@ banner_router_for_admin.message.filter(ChatTypeFilter(["private"]), IsAdmin())
 
 class AddBanner(StatesGroup):
     image = State()
+    description = State()
+    banner_for_change = {}
 
 
 @banner_router_for_admin.callback_query(F.data == 'banners')
@@ -49,7 +51,7 @@ async def banners_menu(callback: types.CallbackQuery, session: AsyncSession):
 async def cmd_show_banners(callback: types.CallbackQuery, session: AsyncSession, state: FSMContext):
     # 1. Запрос к БД
     banners = await orm_get_banners(session)
-
+    
     if not banners:
         await callback.answer()
         return await callback.message.answer('Баннеры еще не добавлены.')
@@ -58,7 +60,7 @@ async def cmd_show_banners(callback: types.CallbackQuery, session: AsyncSession,
     await callback.answer()
     for row in banners:
         builder = InlineKeyboardBuilder()
-        ### Данная затея не рассматривается
+        # Данная затея не рассматривается
         # builder.button(
         #     text="🗑 Удалить",
         #     callback_data=BannerClick(
@@ -73,13 +75,14 @@ async def cmd_show_banners(callback: types.CallbackQuery, session: AsyncSession,
         if row.image:
             await callback.message.answer_photo(
                 photo=row.image,
+                caption=row.description,
                 reply_markup=builder.as_markup(),
                 parse_mode="Markdown"
             )
         else:
             # Если картинки нет, отправляем просто текст, чтобы бот не падал
             await callback.message.answer(
-                text=f"🖼 (Изображение отсутствует)\nВаш текст баннера...\n**{row.name}**",
+                text=f"🖼 (Изображение отсутствует для {row.name})\nВаш текст баннера...\n**{row.description}**",
                 reply_markup=builder.as_markup()
             )
     await callback.message.answer(text='Настройка Баннеров', reply_markup=button_banner_admin)
@@ -96,40 +99,30 @@ async def edit_banner(
     await callback.answer()
     await state.update_data(edit_banner_id=callback_data.banner_id)
 
+    # await state.set_state(AddBanner.image)
     await state.set_state(AddBanner.image)
     await callback.message.answer(
-        f"Загрузите фотографию для баннера (name: {callback_data.banner_name}):"
+        f"Загрузите фото для баннера (name: {callback_data.banner_name}):"
     )
 
     await callback.answer()
 
-# Отправляем перечень информационных страниц бота и становимся в состояние отправки photo
-# @banner_router_for_admin.message(StateFilter(None), F.text == 'Добавить/Изменить баннер')
-# async def add_image2(message: types.Message, state: FSMContext, session: AsyncSession):
-#     pages_names = [page.name for page in await orm_get_info_pages(session)]
-#     await message.answer(f"Отправьте фото баннера.\nВ описании укажите для какой страницы:\
-#                          \n{', '.join(pages_names)}")
-#     await state.set_state(AddBanner.image)
 
-# Добавляем/изменяем изображение в таблице (там уже есть записанные страницы по именам:
-# main, catalog, cart(для пустой корзины), about, payment, shipping
 
 
 @banner_router_for_admin.message(AddBanner.image, F.photo)
 async def add_banner(message: types.Message, state: FSMContext, session: AsyncSession):
     data = await state.get_data()
     banner_id = data.get('edit_banner_id')
-
     try:
         image_id = message.photo[-1].file_id
 
-        
         # Обновляем запись по уникальному banner_id (Primary Key)
         # Это гарантирует изменение ровно одной нужной строки
         await orm_update_banner_image(
-            session=session, 
-            banner_id=banner_id, 
-            image=image_id,
+            session=session,
+            banner_id=banner_id,
+            image=image_id
         )
 
         await message.answer("Баннер успешно обновлен.", reply_markup=button_banner_admin)

@@ -37,14 +37,14 @@ async def settings_menu(callback: types.CallbackQuery, session: AsyncSession):
     await callback.message.edit_text(
         text="Главное меню админа:",
         reply_markup=buttons_start_admin)
-    
+
+
 @admin_router.callback_query(F.data == 'prev_settings')
 async def prev_menu_2(callback: types.CallbackQuery, session: AsyncSession):
     await callback.answer()
     await callback.message.edit_text(
         text="Настройки администратора:",
         reply_markup=button_settings_admin)
-
 
 
 @admin_router.callback_query(F.data == 'settings')
@@ -59,6 +59,14 @@ async def settings_menu(callback: types.CallbackQuery, session: AsyncSession):
 async def recording_menu(callback: types.CallbackQuery, session: AsyncSession):
     await callback.answer()
     return await callback.message.answer("Работаю над расписанием))")
+
+
+@admin_router.callback_query(F.data == 'prev_category')
+async def prev_menu_2(callback: types.CallbackQuery, session: AsyncSession):
+    await callback.answer()
+    await callback.message.edit_text(
+        text="Настройка категорий:",
+        reply_markup=button_categories_admin)
 
 
 admin_router.include_routers(

@@ -32,29 +32,29 @@ service_router_for_admin = Router()
 service_router_for_admin.message.filter(ChatTypeFilter(["private"]), IsAdmin())
 
 
-@service_router_for_admin.callback_query(F.data == 'prev_category')
-async def prev_menu_2(callback: types.CallbackQuery, session: AsyncSession):
-    await callback.answer()
-    await callback.message.edit_text(
-        text="Настройка категорий:",
-        reply_markup=button_categories_admin)
+######################### FSM для дабавления/изменения товаров админом ###################
 
 
-@service_router_for_admin.message(F.text == 'Ассортимент')
-async def admin_features(message: types.Message, session: AsyncSession):
-    categories = await orm_get_categories(session)
-    btns = {category.name: f'category_{category.id}' for category in categories}
-    await message.answer("Выберите категорию", reply_markup=get_callback_btns(btns=btns, sizes=(2, 2,)))
+class AddService(StatesGroup):
+    name = State()
+    description = State()
+    category = State()
+    price = State()
+    image = State()
+    # service_for_change = None  <-- УДАЛИТЕ ЭТУ СТРОКУ
 
 
 @service_router_for_admin.callback_query(CategoryClick.filter(F.action == "category_"))
-async def starring_at_service(callback: types.CallbackQuery, session: AsyncSession, callback_data: CategoryClick):
+async def starring_at_service(callback: types.CallbackQuery, session: AsyncSession, callback_data: CategoryClick, state: FSMContext):
     category_id = callback_data.category_id
     query = await orm_get_services_by_category_id(session=session, category_id=int(category_id))
+    
+    await state.clear()
+    await state.update_data(category=category_id)
 
     if not query or len(query) < 1:
         await callback.answer()
-        await callback.message.answer('Список пуст....', reply_markup=button_service_admin)
+        return await callback.message.answer('Список пуст....', reply_markup=button_service_admin)
 
     await callback.message.delete()
     await callback.answer()
@@ -86,40 +86,27 @@ async def delete_service_callback(callback: types.CallbackQuery, session: AsyncS
     return await callback.message.delete()
 
 
-######################### FSM для дабавления/изменения товаров админом ###################
-class AddService(StatesGroup):
-    # Шаги состояний
-    name = State()
-    description = State()
-    category = State()
-    price = State()
-    image = State()
-
-    service_for_change = None
-
-    texts = {
-        "AddService:name": "Введите название заново:",
-        "AddService:description": "Введите описание заново:",
-        "AddService:price": "Введите стоимость заново:",
-        "AddService:image": "Этот стейт последний, поэтому...",
-    }
-
 # Становимся в состояние ожидания ввода name
 
 
 @service_router_for_admin.callback_query(StateFilter(None), F.data.startswith("change_"))
-async def change_service_callback(
-    callback: types.CallbackQuery, state: FSMContext, session: AsyncSession
-):
-    service_id = callback.data.split("_")[-1]
+async def change_service_callback(callback: types.CallbackQuery, state: FSMContext, session: AsyncSession):
+    service_id = int(callback.data.split("_")[-1])
+    service_for_change = await orm_get_service_by_id(session, service_id)
 
-    service_for_change = await orm_get_service_by_id(session, int(service_id))
-
-    AddService.service_for_change = service_for_change
+    # Сохраняем данные услуги в state, чтобы они были доступны во всех хендлерах
+    await state.update_data(
+        service_id=service_for_change.id,
+        old_name=service_for_change.name,
+        old_description=service_for_change.description,
+        old_price=service_for_change.price,
+        old_image=service_for_change.image
+    )
 
     await callback.answer()
     await callback.message.answer(
-        "Введите название услуги", reply_markup=types.ReplyKeyboardRemove()
+        f"Меняем: {service_for_change.name}\nВведите новое название или '.'",
+        reply_markup=types.ReplyKeyboardRemove()
     )
     await state.set_state(AddService.name)
 
@@ -134,178 +121,128 @@ async def add_service(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(AddService.name)
 
 
-# Хендлер отмены и сброса состояния должен быть всегда именно хдесь,
-# после того как только встали в состояние номер 1 (элементарная очередность фильтров)
-@service_router_for_admin.message(StateFilter("*"), Command("отмена"))
-@service_router_for_admin.message(StateFilter("*"), F.text.casefold() == "отмена")
-async def cancel_handler(message: types.Message, state: FSMContext) -> None:
-    current_state = await state.get_state()
-    if current_state is None:
-        return
-    if AddService.service_for_change:
-        AddService.service_for_change = None
-    await state.clear()
-
-    from ....kbds.reply import ADMIN_KB
-    await message.answer("Действия отменены", reply_markup=ADMIN_KB)
-
-
-# Вернутся на шаг назад (на прошлое состояние)
-@service_router_for_admin.message(StateFilter("*"), Command("назад"))
-@service_router_for_admin.message(StateFilter("*"), F.text.casefold() == "назад")
-async def back_step_handler(message: types.Message, state: FSMContext) -> None:
-    current_state = await state.get_state()
-
-    if current_state == AddService.name:
-        await message.answer(
-            'Предыдущего шага нет, или введите название товара или напишите "отмена"'
-        )
-        return
-
-    previous = None
-    for step in AddService.__all_states__:
-        if step.state == current_state:
-            await state.set_state(previous)
-            await message.answer(
-                f"Ок, вы вернулись к прошлому шагу \n {AddService.texts[previous.state]}"
-            )
-            return
-        previous = step
-
-
-# Ловим данные для состояние name и потом меняем состояние на description
-@service_router_for_admin.message(AddService.name, or_f(F.text, F.text == "."))
+@service_router_for_admin.message(AddService.name)
 async def add_name(message: types.Message, state: FSMContext):
-    if message.text == ".":
-        await state.update_data(name=AddService.service_for_change.name)
-    else:
-        # Здесь можно сделать какую либо дополнительную проверку
-        # и выйти из хендлера не меняя состояние с отправкой соответствующего сообщения
-        # например:
-        if len(message.text) >= 100:
-            await message.answer(
-                "Название услуги не должно превышать 100 символов. \n Введите заново"
-            )
-            return
+    if len(message.text) > 100:
+        return await message.answer("Название слишком длинное (макс. 100 симв.)")
 
+    data = await state.get_data()
+    service_id = data.get("service_id")
+
+    if message.text == "." and service_id:
+        await state.update_data(name=data.get("old_name"))
+    else:
         await state.update_data(name=message.text)
-    await message.answer("Введите описание услуги")
+
+    if service_id:
+        await message.answer(f"Старое описание: {data.get('old_description')}\nВведите новое или '.'")
+    else:
+        await message.answer("Введите описание услуги:")
+
     await state.set_state(AddService.description)
 
-
-# Хендлер для отлова некорректных вводов для состояния name
-@service_router_for_admin.message(AddService.name)
-async def add_name2(message: types.Message, state: FSMContext):
-    await message.answer("Вы ввели не допустимые данные, введите текст названия услуги")
+# Ловим description
 
 
-# Ловим данные для состояние description и потом меняем состояние на price
-@service_router_for_admin.message(AddService.description, or_f(F.text, F.text == "."))
-async def add_description(message: types.Message, state: FSMContext, session: AsyncSession):
-    if message.text == "." and AddService.service_for_change:
-        await state.update_data(description=AddService.service_for_change.description)
-    else:
-        if 4 >= len(message.text) >= 150:
-            await message.answer(
-                "Название товара не должно превышать 150 символов\nили быть менее 5ти символов. \n Введите заново"
-            )
-            return
-        else:
-            await state.update_data(description=message.text)
-
-    categories = await orm_get_categories(session=session)
-    btns = {category.name: str(category.id) for category in categories}
-    await message.answer("Выберите категорию", reply_markup=get_callback_btns(btns=btns))
-    await state.set_state(AddService.category)
-    await state.set_state(AddService.category)
-
-
-# Хендлер для отлова некорректных вводов для состояния description
 @service_router_for_admin.message(AddService.description)
-async def add_description2(message: types.Message, state: FSMContext):
-    await message.answer("Вы ввели не допустимые данные, введите текст описания услуги")
+async def add_description(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    service_id = data.get("service_id")
 
-# Ловим callback выбора категории
-
-
-@service_router_for_admin.callback_query(AddService.category)
-async def category_choice(callback: types.CallbackQuery, state: FSMContext, session: AsyncSession):
-    if int(callback.data) in [category.id for category in await orm_get_categories(session)]:
-        await callback.answer()
-        await state.update_data(category=callback.data)
-        await callback.message.answer('Теперь введите цену услуги.')
-        await state.set_state(AddService.price)
+    if message.text == "." and service_id:
+        await state.update_data(description=data.get("old_description"))
     else:
-        await callback.message.answer('Выберите катеорию из кнопок.')
-        await callback.answer()
+        # Исправленная проверка длины
+        if not (5 <= len(message.text) <= 150):
+            return await message.answer("Описание должно быть от 5 до 150 символов.")
+        await state.update_data(description=message.text)
 
-# Ловим любые некорректные действия, кроме нажатия на кнопку выбора категории
+    if service_id:
+        await message.answer(f"Старая цена: {data.get('old_price')}\nВведите новую или '.'")
+    else:
+        await message.answer("Введите цену услуги:")
+
+    await state.set_state(AddService.price)
 
 
-@service_router_for_admin.message(AddService.category)
-async def category_choice2(message: types.Message, state: FSMContext):
-    await message.answer("'Выберите катеорию из кнопок.'")
-
-
-# Ловим данные для состояние price и потом меняем состояние на image
 @service_router_for_admin.message(AddService.price, or_f(F.text, F.text == "."))
 async def add_price(message: types.Message, state: FSMContext):
-    price = message.text.replace(" ", "")
-    if price == "." and AddService.service_for_change:
-        await state.update_data(price=AddService.service_for_change.price)
-    else:
-        try:
-            float(price)
-        except ValueError:
-            await message.answer("Введите корректное значение цены")
-            return
+    data = await state.get_data()
+    service_id = data.get("service_id")
 
-        await state.update_data(price=price)
-    if float(price) > 999999:
-        await message.answer("Число не может быть больше 999 999")
+    # 1. Если ввели точку при редактировании
+    if message.text == "." and service_id:
+        old_price = data.get("old_price")
+
+        # Безопасно сохраняем как число
+        await state.update_data(price=str(old_price))
+        await message.answer("Цена оставлена прежней. Будете менять фото? Отправьте новое или '.'")
+        await state.set_state(AddService.image)
         return
-    await message.answer("Загрузите изображение товара")
-    await state.set_state(AddService.image)
+
+    # 2. Если это ввод новой цены (или создание новой услуги)
+    price_text = message.text.replace(" ", "").replace(",", ".")
+
+    try:
+        price_float = float(price_text)
+        if price_float > 999999:
+            return await message.answer("Число не может быть больше 999 999")
+
+        await state.update_data(price=price_text)
+
+        if service_id:
+            await message.answer("Цена обновлена. Отправьте новое фото или '.'")
+        else:
+            await message.answer("Теперь загрузите изображение услуги.")
+
+        await state.set_state(AddService.image)
+
+    except ValueError:
+        return await message.answer("Введите корректное число (например, 500 или 500.50)")
 
 
-# Хендлер для отлова некорректных ввода для состояния price
-@service_router_for_admin.message(AddService.price)
-async def add_price2(message: types.Message, state: FSMContext):
-    await message.answer("Вы ввели не допустимые данные, введите стоимость услуги")
-
-
-# Ловим данные для состояние image и потом выходим из состояний
 @service_router_for_admin.message(AddService.image, or_f(F.photo, F.text == "."))
 async def add_image(message: types.Message, state: FSMContext, session: AsyncSession):
-    if message.text and message.text == "." and AddService.service_for_change:
-        await state.update_data(image=AddService.service_for_change.image)
-
-    elif message.photo:
-        await state.update_data(image=message.photo[-1].file_id)
-    else:
-        await message.answer("Отправьте фото услуги")
-        return
     data = await state.get_data()
-    try:
-        if AddService.service_for_change:
-            await orm_update_service_by_id(session, AddService.service_for_change.id, data)
+    # Проверяем, редактируем ли мы или создаем
+    service_id = data.get("service_id")
+
+    # 1. Определяем, какое изображение использовать
+    if message.text == ".":
+        if service_id:
+            # Если точка при редактировании — берем старое фото
+            image_to_save = data.get("old_image")
         else:
-            await orm_add_service(session, data)
-        await message.answer("Услуга добавлена/изменена", reply_markup=ADMIN_KB)
+            return await message.answer("При добавлении новой услуги нельзя ставить точку. Отправьте фото.")
+    elif message.photo:
+        # Если прислали новое фото — берем его
+        image_to_save = message.photo[-1].file_id
+    else:
+        return await message.answer("Пожалуйста, отправьте фото услуги или '.' для сохранения старого.")
+
+    # Обновляем data финальным фото
+    await state.update_data(image=image_to_save)
+
+    # 2. Получаем все накопленные данные из FSM
+    final_data = await state.get_data()
+    print(final_data)
+    try:
+        if service_id:
+            # Если есть ID — вызываем UPDATE
+            await orm_update_service_by_id(session, service_id, final_data)
+            await message.answer("Услуга успешно обновлена!", reply_markup=button_service_admin)
+        else:
+            # Если ID нет — вызываем INSERT
+            await orm_add_service(session, final_data)
+            await message.answer("Услуга успешно добавлена!", reply_markup=button_service_admin)
+
+        # 3. Обязательно очищаем состояние
         await state.clear()
 
     except Exception as e:
         await message.answer(
-            f"Ошибка: \n{str(e)}\nОбратись к Владу, он опять денег хочет",
-            reply_markup=ADMIN_KB,
+            f"Произошла ошибка при сохранении в БД: \n{str(e)}",
+            reply_markup=button_service_admin,
         )
+        # В случае ошибки тоже лучше очистить стейт, чтобы не застрять в цикле
         await state.clear()
-
-    AddService.service_for_change = None
-
-# Ловим все прочее некорректное поведение для этого состояния
-
-
-@service_router_for_admin.message(AddService.image)
-async def add_image2(message: types.Message, state: FSMContext):
-    await message.answer("Отправьте фото услуги")
