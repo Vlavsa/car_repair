@@ -38,10 +38,11 @@ async def catalog_menu(session, level, menu_name):
 
 def pages(paginator: Paginator):
     btns = dict()
+
     if paginator.has_previous():
-        btns[" Пред."] = "prev"
+        btns["⬅️ Пред."] = "prev"
     if paginator.has_next():
-        btns["След. "] = 'next'
+        btns["След. ➡️"] = 'next'
 
     return btns
 
@@ -68,7 +69,6 @@ async def products_menu(session, level, category, page):
     )
 
     return image, kbds
-
 
 
 async def order_menu(session, level, menu_name):

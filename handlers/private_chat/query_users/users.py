@@ -25,8 +25,8 @@ class AddClient(StatesGroup):
     wait_phone = State()
 
 
-async def check_image_for_menu(message: types.Message, session: AsyncSession):
-    media, replay_markup = await get_menu_content(session, level=0, menu_name="main")
+async def check_image_for_menu(message: types.Message, session: AsyncSession, menu_name="main"):
+    media, replay_markup = await get_menu_content(session, level=0, menu_name=menu_name)
 
     if isinstance(media, types.InputMediaPhoto):
         await message.answer_photo(
@@ -39,6 +39,9 @@ async def check_image_for_menu(message: types.Message, session: AsyncSession):
         await message.answer(
             text=f"🖼 (Изображение отсутствует для {media.name})\n\n{media.description}",
             reply_markup=replay_markup)
+
+
+
 
 
 @user_router.message(CommandStart())
@@ -76,15 +79,24 @@ async def get_phone(message: types.Message, state: FSMContext, session: AsyncSes
     await state.clear()  # Не забудьте очистить состояние после регистрации
 
     await message.answer(
-        "Регистрация завершена! \nТеперь вам доступны просмотр и запись.",
+        "Регистрация завершена!",
         reply_markup=types.ReplyKeyboardRemove()  # Убираем кнопку контакта
     )
     await check_image_for_menu(message=message, session=session)
-    await state.clear()
+
+
+async def add_to_order(callback: types.CallbackQuery, callback_data: MenuCallBack, session: AsyncSession):
+    client_id = callback.message.from_user.id
+    print(client_id)
 
 
 @user_router.callback_query(MenuCallBack.filter())
 async def user_menu(callback: types.CallbackQuery, callback_data: MenuCallBack, session: AsyncSession):
+
+    if callback_data.menu_name == "add_to_order":
+        await add_to_order(callback=callback, callback_data=callback_data, session=session)
+        return
+
     media, replay_markup = await get_menu_content(
         session,
         level=callback_data.level,
@@ -92,10 +104,10 @@ async def user_menu(callback: types.CallbackQuery, callback_data: MenuCallBack, 
         category=callback_data.category,
         page=callback_data.page,
     )
-    
+
     if callback.message.text and isinstance(media, types.InputMediaPhoto):
         await callback.message.delete()  # Удаляем старый текст
-        await callback.message.answer_photo( # Отправляем новое фото
+        await callback.message.answer_photo(  # Отправляем новое фото
             photo=media.media,
             caption=media.caption,
             reply_markup=replay_markup
@@ -103,7 +115,7 @@ async def user_menu(callback: types.CallbackQuery, callback_data: MenuCallBack, 
 
     elif callback.message.photo and isinstance(media, types.InputMediaPhoto):
         await callback.message.edit_media(
-            media=media, # Передаем объект целиком
+            media=media,  # Передаем объект целиком
             reply_markup=replay_markup
         )
 
