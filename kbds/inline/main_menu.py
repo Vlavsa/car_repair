@@ -3,14 +3,16 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import InlineKeyboardButton
 
 
+class MenuCallBackAdmin(CallbackData, prefix="admin_menu"):
+    level: int
+    menu_name: str
+
 class MenuCallBack(CallbackData, prefix="menu"):
     level: int
     menu_name: str
     category: int | None = None
     page: int | None = 1
     product_id: int | None = None
-
-
 
 
 def get_client_main_btns(
@@ -38,3 +40,32 @@ def get_client_main_btns(
             keyboard.add(InlineKeyboardButton(text=text,
                                               callback_data=MenuCallBack(level=level, menu_name=menu_name).pack()))
     return keyboard.adjust(*sizes).as_markup()
+
+
+def get_admin_main_btns(
+        *,
+        level: int,
+        sizes: tuple[int] = (2,),
+):
+    keyboard = InlineKeyboardBuilder()
+    btns = {
+        "⚙️ Настройки": "settings",
+        "Записи": "orders",
+        "Выход": "exit",
+
+    }
+    for text, menu_name in btns.items():
+        if menu_name == 'settings':
+            keyboard.add(InlineKeyboardButton(text=text,
+                                              callback_data=MenuCallBackAdmin(level=level+1, menu_name=menu_name).pack()))
+
+        elif menu_name == 'orders':
+            keyboard.add(InlineKeyboardButton(text=text,
+                                              callback_data=MenuCallBackAdmin(level=3, menu_name=menu_name).pack()))
+
+        else:
+            keyboard.add(InlineKeyboardButton(text=text,
+                                              callback_data=MenuCallBackAdmin(level=level, menu_name=menu_name).pack()))
+    return keyboard.adjust(*sizes).as_markup()
+
+

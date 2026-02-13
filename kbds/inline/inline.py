@@ -3,7 +3,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import InlineKeyboardButton
 
 
-from kbds.inline.main_menu_client import MenuCallBack
+from kbds.inline.main_menu import MenuCallBack
 
 
 def get_callback_btns(

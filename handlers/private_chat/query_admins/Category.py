@@ -8,7 +8,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
 from kbds.inline.categories_admin import CategoryClick, get_paginated_categories_kb
-from kbds.inline.inline import get_callback_btns
+
 from kbds.reply import ADMIN_KB
 
 from sqlalchemy.ext.asyncio import AsyncSession
