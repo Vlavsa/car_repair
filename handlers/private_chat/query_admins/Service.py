@@ -132,6 +132,8 @@ async def add_name(message: types.Message, state: FSMContext):
     if message.text == "." and service_id:
         await state.update_data(name=data.get("old_name"))
     else:
+        if not (5 <= len(message.text) <= 150):
+            return await message.answer("Описание должно быть от 5 до 150 символов.")
         await state.update_data(name=message.text)
 
     if service_id:
@@ -185,7 +187,7 @@ async def add_price(message: types.Message, state: FSMContext):
 
     try:
         price_float = float(price_text)
-        if price_float > 999999:
+        if 0 > price_float > 999999:
             return await message.answer("Число не может быть больше 999 999")
 
         await state.update_data(price=price_text)
@@ -204,6 +206,7 @@ async def add_price(message: types.Message, state: FSMContext):
 @service_router_for_admin.message(AddService.image, or_f(F.photo, F.text == "."))
 async def add_image(message: types.Message, state: FSMContext, session: AsyncSession):
     data = await state.get_data()
+    print(f"DEBUG: Функция дошла до конца! Входящие данные: {data}")
     # Проверяем, редактируем ли мы или создаем
     service_id = data.get("service_id")
 

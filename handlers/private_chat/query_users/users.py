@@ -94,8 +94,8 @@ async def add_to_order(callback: types.CallbackQuery, callback_data: MenuCallBac
 async def user_menu(callback: types.CallbackQuery, callback_data: MenuCallBack, session: AsyncSession):
 
     if callback_data.menu_name == "add_to_order":
-        await add_to_order(callback=callback, callback_data=callback_data, session=session)
-        return
+        return await add_to_order(callback=callback, callback_data=callback_data, session=session)
+        
 
     media, replay_markup = await get_menu_content(
         session,
