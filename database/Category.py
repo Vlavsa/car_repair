@@ -6,6 +6,13 @@ from sqlalchemy import select, update, delete
 from database.models import Base, Category, Service
 
 
+async def orm_check_category_by_id(session: AsyncSession, id_category):
+    query = select(Category).where(Category.id == id_category)
+    category = (await session.execute(query)).scalar_one_or_none()
+    return category
+
+
+
 async def orm_add_category(session: AsyncSession, data: dict):
     obj = Category(
         name=data["name"],

@@ -11,9 +11,9 @@ from database.Client import orm_check_client, orm_add_client\
 
 from filters.chat_types import ChatTypeFilter
 
-from kbds.inline.main_menu_client import MenuCallBack
+from kbds.inline.main_menu import MenuCallBack
 
-from handlers.private_chat.query_users.menu_processing import get_menu_content
+from handlers.private_chat.query_users.menu_processing import check_image_for_menu, get_menu_content
 
 user_router = Router()
 user_router.message.filter(ChatTypeFilter(["private"]))
@@ -23,25 +23,6 @@ class AddClient(StatesGroup):
     # Шаги состояний
     name = State()
     wait_phone = State()
-
-
-async def check_image_for_menu(message: types.Message, session: AsyncSession, menu_name="main"):
-    media, replay_markup = await get_menu_content(session, level=0, menu_name=menu_name)
-
-    if isinstance(media, types.InputMediaPhoto):
-        await message.answer_photo(
-            photo=media.media,
-            caption=media.caption,
-            reply_markup=replay_markup
-        )
-
-    else:
-        await message.answer(
-            text=f"🖼 (Изображение отсутствует для {media.name})\n\n{media.description}",
-            reply_markup=replay_markup)
-
-
-
 
 
 @user_router.message(CommandStart())
@@ -85,18 +66,8 @@ async def get_phone(message: types.Message, state: FSMContext, session: AsyncSes
     await check_image_for_menu(message=message, session=session)
 
 
-async def add_to_order(callback: types.CallbackQuery, callback_data: MenuCallBack, session: AsyncSession):
-    client_id = callback.message.from_user.id
-    print(client_id)
-
-
 @user_router.callback_query(MenuCallBack.filter())
 async def user_menu(callback: types.CallbackQuery, callback_data: MenuCallBack, session: AsyncSession):
-
-    if callback_data.menu_name == "add_to_order":
-        return await add_to_order(callback=callback, callback_data=callback_data, session=session)
-        
-
     media, replay_markup = await get_menu_content(
         session,
         level=callback_data.level,

@@ -6,8 +6,24 @@ from database.Paginator import Paginator
 from database.Banner import orm_get_banner
 from database.Category import orm_get_categories_inner_join_services
 from database.Service import orm_get_services_by_category_id
-from kbds.inline.main_menu_client import get_client_main_btns
+from kbds.inline.main_menu import get_client_main_btns
 from kbds.inline.inline import get_products_btns, get_user_catalog_btns
+
+
+async def check_image_for_menu(message: types.Message, session: AsyncSession, menu_name: str = "main"):
+    media, replay_markup = await get_menu_content(session, level=0, menu_name=menu_name)
+
+    if isinstance(media, types.InputMediaPhoto):
+        await message.answer_photo(
+            photo=media.media,
+            caption=media.caption,
+            reply_markup=replay_markup
+        )
+
+    else:
+        await message.answer(
+            text=f"🖼 (Изображение отсутствует для {media.name})\n\n{media.description}",
+            reply_markup=replay_markup)
 
 
 async def main_menu(session, level, menu_name):
@@ -25,7 +41,7 @@ async def main_menu(session, level, menu_name):
 async def catalog_menu(session, level, menu_name):
     banner = await orm_get_banner(session=session, page=menu_name)
     categories = await orm_get_categories_inner_join_services(session=session)
-    print(categories)
+
     kbds = get_user_catalog_btns(level=level, categories=categories)
 
     if not banner.image:
@@ -47,7 +63,7 @@ def pages(paginator: Paginator):
     return btns
 
 
-async def products_menu(session, level, category, page):
+async def services_menu(session, level, category, page):
     products = await orm_get_services_by_category_id(session=session, category_id=category)
     paginator = Paginator(products, page)
     product = paginator.get_page()[0]
@@ -88,4 +104,4 @@ async def get_menu_content(
     elif level == 1:
         return await catalog_menu(session, level, menu_name)
     elif level == 2:
-        return await products_menu(session, level, category, page)
+        return await services_menu(session, level, category, page)

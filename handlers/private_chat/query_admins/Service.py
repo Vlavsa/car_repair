@@ -1,3 +1,4 @@
+from decimal import Decimal
 from aiogram import F, Router, types
 
 
@@ -23,6 +24,7 @@ from database.Service import (
 
 )
 from database.Category import (
+    orm_check_category_by_id,
     orm_get_categories,
     orm_get_categories_inner_join_services
 )
@@ -48,7 +50,7 @@ class AddService(StatesGroup):
 async def starring_at_service(callback: types.CallbackQuery, session: AsyncSession, callback_data: CategoryClick, state: FSMContext):
     category_id = callback_data.category_id
     query = await orm_get_services_by_category_id(session=session, category_id=int(category_id))
-    
+
     await state.clear()
     await state.update_data(category=category_id)
 
@@ -99,6 +101,7 @@ async def change_service_callback(callback: types.CallbackQuery, state: FSMConte
         service_id=service_for_change.id,
         old_name=service_for_change.name,
         old_description=service_for_change.description,
+        old_category=service_for_change.category,
         old_price=service_for_change.price,
         old_image=service_for_change.image
     )
@@ -123,8 +126,8 @@ async def add_service(callback: types.CallbackQuery, state: FSMContext):
 
 @service_router_for_admin.message(AddService.name)
 async def add_name(message: types.Message, state: FSMContext):
-    if len(message.text) > 100:
-        return await message.answer("Название слишком длинное (макс. 100 симв.)")
+    if len(message.text) > 150:
+        return await message.answer("Название слишком длинное (макс. 150 симв.)")
 
     data = await state.get_data()
     service_id = data.get("service_id")
@@ -168,16 +171,18 @@ async def add_description(message: types.Message, state: FSMContext):
 
 
 @service_router_for_admin.message(AddService.price, or_f(F.text, F.text == "."))
-async def add_price(message: types.Message, state: FSMContext):
+async def add_price(message: types.Message, state: FSMContext, session: AsyncSession):
     data = await state.get_data()
     service_id = data.get("service_id")
-
+    category = data.get('category')
+    print('_____________________________________________________________')
+    print(category)
     # 1. Если ввели точку при редактировании
     if message.text == "." and service_id:
         old_price = data.get("old_price")
 
         # Безопасно сохраняем как число
-        await state.update_data(price=str(old_price))
+        await state.update_data(price=old_price)
         await message.answer("Цена оставлена прежней. Будете менять фото? Отправьте новое или '.'")
         await state.set_state(AddService.image)
         return
@@ -186,21 +191,59 @@ async def add_price(message: types.Message, state: FSMContext):
     price_text = message.text.replace(" ", "").replace(",", ".")
 
     try:
-        price_float = float(price_text)
-        if 0 > price_float > 999999:
-            return await message.answer("Число не может быть больше 999 999")
 
-        await state.update_data(price=price_text)
+        price_val = Decimal(price_text)
+        if -1 >  price_val > 999999:
+            return await message.answer("Число не может быть больше 999 999 или меньше 0")
+
+
+        await state.update_data(price=price_val)
 
         if service_id:
-            await message.answer("Цена обновлена. Отправьте новое фото или '.'")
+            await message.answer("Цена обновлена. Выберите категорию или '.'")
+            await state.set_state(AddService.category)
         else:
-            await message.answer("Теперь загрузите изображение услуги.")
+            if category:
+                await message.answer("Теперь загрузите фотографию")
+                await state.set_state(AddService.image)
+            else:
+                categories = await orm_get_categories(session=session)
+                categories_data = {cat.name: f"cat_{cat.id}" for cat in categories}
+                await message.answer("Теперь выберите категорию", reply_markup=get_callback_btns(btns=categories_data, sizes=(2,)))
+                await state.set_state(AddService.category)
 
+    except Exception as e:
+        await message.answer(
+            f"Введите корректное число (по типу 500.00 или 5000,00)")
+        print(e)
+
+@service_router_for_admin.callback_query(AddService.category, or_f(F.data.startswith('cat_'), F.text == "."))
+async def add_categories_for_service(callback: types.CallbackQuery, session: AsyncSession, state: FSMContext):
+    if callback.data == ".":
+
+        data = await state.get_data()
+        id_category = data.get("old_category")
+        await state.update_data(category=id_category)
+        await callback.message.answer("Теперь добавить фотографию")
+        await callback.answer()
         await state.set_state(AddService.image)
 
-    except ValueError:
-        return await message.answer("Введите корректное число (например, 500 или 500.50)")
+
+    id_category = int(callback.data.split('_')[-1])
+    category =  await orm_check_category_by_id(session=session, id_category=id_category)
+
+    if not category:
+            categories = await orm_get_categories(session=session)
+            categories_data = {cat.name: f"cat_{cat.id}" for cat in categories}
+            await callback.message.answer("Выберите категорию из доступных", reply_markup=get_callback_btns(btns=categories_data, sizes=(2,)))
+            await callback.answer()
+            return
+
+    await state.update_data(category=id_category)
+    await callback.message.answer("Теперь добавить фотографию")
+    await callback.answer()
+    await state.set_state(AddService.image)
+
 
 
 @service_router_for_admin.message(AddService.image, or_f(F.photo, F.text == "."))
@@ -243,9 +286,7 @@ async def add_image(message: types.Message, state: FSMContext, session: AsyncSes
         await state.clear()
 
     except Exception as e:
+        print(e)
         await message.answer(
-            f"Произошла ошибка при сохранении в БД: \n{str(e)}",
-            reply_markup=button_service_admin,
+            f"Отправьте корректно изображиние..."
         )
-        # В случае ошибки тоже лучше очистить стейт, чтобы не застрять в цикле
-        await state.clear()
