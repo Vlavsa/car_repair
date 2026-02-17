@@ -5,10 +5,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.Paginator import Paginator
 from database.Banner import orm_get_banner
-from database.Category import orm_get_categories_inner_join_services
+from database.Category import orm_get_categories_inner_join_services, orm_get_categories, orm_get_categories_with_count_services
 from database.Service import orm_get_services_by_category_id
 from kbds.inline.main_menu import MenuCallBackAdmin, get_admin_main_btns, get_client_main_btns
 from kbds.inline.inline import get_callback_btns, get_products_btns, get_user_catalog_btns
+
+
+async def check_image_for_menu(message: types.Message, session: AsyncSession, menu_name: str = "main", level: int = 0):
+    media, replay_markup = await get_menu_content_for_admin(session, level=0, menu_name=menu_name)
+
+    if isinstance(media, types.InputMediaPhoto):
+        await message.answer_photo(
+            photo=media.media,
+            caption=media.caption,
+            reply_markup=replay_markup
+        )
+
+    else:
+        await message.answer(
+            text=f"🖼 {media}",
+            reply_markup=replay_markup)
 
 
 async def main_menu(session, level, menu_name):
@@ -30,28 +46,36 @@ async def settings_menu(session, level, menu_name):
     }
 
     for text, target_menu in btns.items():
-        if target_menu == 'main':
-            # Назад на уровень 0
-            callback = MenuCallBackAdmin(level=0, menu_name=target_menu)
-        else:
-            # Переход на уровень 2 (дистрибьютор)
-            callback = MenuCallBackAdmin(level=2, menu_name=target_menu)
+        target_level = level - 1 if target_menu == 'main' else 2
 
         keyboard.add(InlineKeyboardButton(
-            text=text, callback_data=callback.pack()))
-        
-            # Кнопка назад на главный экран (level 0)
-    keyboard.add(InlineKeyboardButton(
-        text="🔙 Назад",
-        callback_data=MenuCallBackAdmin(level=0, menu_name='main').pack()
-    ))
+            text=text,
+            callback_data=MenuCallBackAdmin(
+                level=target_level, menu_name=target_menu).pack()
+        ))
 
+    print(headline)
     return headline, keyboard.adjust(2).as_markup()
 
 
 async def category_menu(session, level, menu_name):
-    print('category_menu')
-    print(menu_name, level)
+    categories = await orm_get_categories_with_count_services(session=session)
+    keyboard = InlineKeyboardBuilder()
+    headline = " Настройка категорий: "
+
+    btns = {
+        "Создать": "add_category",
+        '🔙 Назад': 'setting'
+    }
+
+
+    for text, target_menu in btns.items():
+        if menu_name == "setting":
+            keyboard.add(InlineKeyboardButton(text=text, callback_data=MenuCallBackAdmin(
+                level=level-1, menu_name=target_menu).pack()))
+        # keyboard.add(InlineKeyboardButton(text=text, callback_data=MenuCallBackAdmin(
+        #     level=level+1, menu_name=target_menu).pack()))
+    return headline, keyboard.adjust(2).as_markup()
 
 
 async def banner_menu(session, level, menu_name):
@@ -92,8 +116,10 @@ async def get_menu_content_for_admin(
 ):
 
     if level == 0:
+        print('000000000000000000000000000000000000000000')
         return await main_menu(session, level, menu_name)
     elif level == 1:
+        print('111111111111111111111111111111111111111111')
         return await settings_menu(session, level, menu_name)
     elif level == 2:
         return await distributor_menu(session, level, menu_name)

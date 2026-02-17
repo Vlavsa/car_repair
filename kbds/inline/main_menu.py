@@ -49,17 +49,19 @@ def get_admin_main_btns(
 ):
     keyboard = InlineKeyboardBuilder()
     btns = {
-        "⚙️ Настройки": "settings",
-        "Записи": "orders",
+        "⚙️ Настройки": "setting",
+        "Записи": "order",
         "Выход": "exit",
 
     }
     for text, menu_name in btns.items():
-        if menu_name == 'settings':
+        if menu_name == 'setting':
+            print('setting')
+            print(text, level+1, menu_name)
             keyboard.add(InlineKeyboardButton(text=text,
                                               callback_data=MenuCallBackAdmin(level=level+1, menu_name=menu_name).pack()))
 
-        elif menu_name == 'orders':
+        elif menu_name == 'order':
             keyboard.add(InlineKeyboardButton(text=text,
                                               callback_data=MenuCallBackAdmin(level=3, menu_name=menu_name).pack()))
 

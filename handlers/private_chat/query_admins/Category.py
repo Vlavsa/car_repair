@@ -8,7 +8,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
 from kbds.inline.categories_admin import CategoryClick, get_paginated_categories_kb
-
+from kbds.inline.main_menu import MenuCallBackAdmin
 from kbds.reply import ADMIN_KB
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -52,7 +52,7 @@ async def categories_menu(callback: types.CallbackQuery, session: AsyncSession):
         reply_markup=button_categories_admin)
 
 
-@category_router_for_admin.callback_query(F.data == 'categories_list')
+@category_router_for_admin.callback_query(MenuCallBackAdmin.filter(F.data == 'categories_list'))
 async def cmd_show_categories(callback: types.CallbackQuery, session: AsyncSession, state: FSMContext):
     # 1. Запрос к БД
     categories = await orm_get_categories_with_count_services(session)
@@ -97,7 +97,7 @@ async def cmd_show_categories(callback: types.CallbackQuery, session: AsyncSessi
             reply_markup=builder.as_markup(),
             parse_mode="Markdown"
         )
-    sent_messages = await callback.message.answer(
+    await callback.message.answer(
         text="Настройки категорий:",
         reply_markup=button_categories_admin)
 
