@@ -36,10 +36,14 @@ category_router_for_admin = Router()
 category_router_for_admin.message.filter(
     ChatTypeFilter(["private"]), IsAdmin())
 
+
 class ClickCategory(CallbackData, prefix="cat_"):
+    pref: str  # "delete", "update", "confirm_delete"
     category_id: int | None = None
-    pref: str
-    
+    category_name: str | None = None
+    page: int | None = 1  # Текущая страница пагинации
+
+
 class AddCategory(StatesGroup):
     # Шаги состояний
     name = State()
@@ -51,208 +55,199 @@ class AddCategory(StatesGroup):
 
 async def category_menu(session, level, menu_name, page):
     categories = await orm_get_categories_with_count_services(session=session)
-    
-    keyboard = InlineKeyboardBuilder()
-
-    keyboard.add(types.InlineKeyboardButton(text='🔙 Назад', callback_data=MenuCallBackAdmin(
-        level=level-1, menu_name='settings').pack()))
-    keyboard.add(types.InlineKeyboardButton(text='Создать', callback_data='add_category'))
 
     if not categories:
-        return "📂 Список категорий пуст...", keyboard.adjust(*(2,),).as_markup()
+        kb = InlineKeyboardBuilder()
+        kb.add(InlineKeyboardButton(
+            text='➕ Создать категорию', callback_data='add_category'))
+        kb.add(InlineKeyboardButton(text='🔙 Назад', callback_data=MenuCallBackAdmin(
+            level=level-1, menu_name='settings').pack()))
+        return "📂 Список категорий пуст...", kb.adjust(1).as_markup()
 
-    keyboard.adjust(*(2,),)
+    # Пагинация
+    paginator = Paginator(categories, page=page)
 
-    paginator = Paginator(categories, page)
-    category_count = paginator.get_page()[0]
-    category = category_count[0]
-    count = category_count[1]
+    if not paginator.get_page():
+        page = paginator.pages
+        paginator = Paginator(categories, page=page)
+
+    page_data = paginator.get_page()
+    category, count = page_data[0]
 
     headline = (
         f"🗄 **Категория: {category.name}**\n"
         f"────────────────────\n"
-        f"\n"
         f"📊 Всего услуг в базе: {count}\n"
     )
+
+    # Получаем кнопки управления и пагинации
     pagination_btns = pages(paginator)
     kb_builder = get_categories_btns(
-        level=level, page=page, category_id=category, pagination_btns=pagination_btns)
-    keyboard.attach(kb_builder)
-    return headline, keyboard.adjust(*(2,)).as_markup()
+        level=level,
+        page=page,
+        category=category,  # Передаем сам объект категории
+        pagination_btns=pagination_btns
+    )
+
+    # Добавляем общие кнопки управления меню
+    kb_builder.row(
+        InlineKeyboardButton(text='➕ Создать новую',
+                             callback_data='add_category'),
+        InlineKeyboardButton(text='🔙 Назад', callback_data=MenuCallBackAdmin(
+            level=level-1, menu_name='settings').pack())
+    )
+    return headline, kb_builder.as_markup()
 
 
 def get_categories_btns(
     *,
     page: int,
     level: int,
-    category: dict,
+    category: object,
     pagination_btns: dict,
     sizes: tuple[int] = (2,),
-
 ):
     keyboard = InlineKeyboardBuilder()
 
-    keyboard.add(InlineKeyboardButton(text="Удалить", callback_data=(ClickCategory(category_id=category.id, pref="delete").pack())))
-    keyboard.add(InlineKeyboardButton(text="Изменить", callback_data=(ClickCategory(category_id=category.id, pref="update").pack())))
-    keyboard.add(InlineKeyboardButton(text="Услуги", callback_data=MenuCallBackAdmin(level=level+1, menu_name=category.name, category_id=category.id)))
-    
+    # В каждую кнопку управления добавляем текущую страницу page
+    keyboard.add(
+        InlineKeyboardButton(text="🗑 Удалить", callback_data=ClickCategory(
+            category_id=category.id, category_name=category.name, pref="delete", page=page).pack()),
+        InlineKeyboardButton(text="✏️ Изменить", callback_data=ClickCategory(
+            category_id=category.id, category_name=category.name, pref="update", page=page).pack()),
+        # Для услуг можно использовать menu_name="services"
+        InlineKeyboardButton(text="📂 Услуги", callback_data=MenuCallBackAdmin(
+            level=level+1, menu_name="services", category_id=category.id).pack())
+    )
 
     keyboard.adjust(*sizes)
 
-    row = []
-    
-    for text, menu_name in pagination_btns.items():
-        if menu_name == "next":
-            row.append(InlineKeyboardButton(text=text, callback_data=MenuCallBackAdmin(
+    # Ряд пагинации
+    nav_row = []
+    for text, action in pagination_btns.items():
+        if action == "next":
+            nav_row.append(InlineKeyboardButton(text=text, callback_data=MenuCallBackAdmin(
                 level=level, menu_name="category", page=page + 1).pack()))
-        elif menu_name == "prev":
-            row.append(InlineKeyboardButton(text=text, callback_data=MenuCallBackAdmin(
+        elif action == "prev":
+            nav_row.append(InlineKeyboardButton(text=text, callback_data=MenuCallBackAdmin(
                 level=level, menu_name="category", page=page - 1).pack()))
 
-    return keyboard.row(*row)
+    if nav_row:
+        keyboard.row(*nav_row)
 
-    # @category_router_for_admin.callback_query(F.data == 'categories')
-    # async def categories_menu(callback: types.CallbackQuery, session: AsyncSession):
-    #     await callback.answer()
-    #     await callback.message.edit_text(
-    #         text="Настройка категорий:",
-    #         reply_markup=button_categories_admin)
+    return keyboard
 
-    # @category_router_for_admin.callback_query(MenuCallBackAdmin.filter(F.data == 'categories_list'))
-    # async def cmd_show_categories(callback: types.CallbackQuery, session: AsyncSession, state: FSMContext):
-    #     # 1. Запрос к БД
-    #     categories = await orm_get_categories_with_count_services(session)
+# Хендлер добавления категории
 
-    #     if not categories:
-    #         await callback.answer()
-    #         return await callback.message.answer("Категорий пока нет.")
 
-    #     await callback.message.delete()
-    #     await callback.answer()
-    #     # 2. Перебор данных и отправка сообщений (карточек)
-    #     for row in categories:
-    #         category = row[0]  # Объект Category
-    #         count = row[1]     # Результат count
-    #         # Создаем кнопки именно для этой карточки
-    #         builder = InlineKeyboardBuilder()
-    #         builder.button(
-    #             text="📖 Список",
-    #             callback_data=CategoryClick(
-    #                 action="category_", category_id=category.id)
-    #         )
-    #         builder.button(
-    #             text="🗑 Удалить",
-    #             callback_data=CategoryClick(
-    #                 action="delete", category_id=category.id)
-    #         )
-    #         builder.button(
-    #             text="✏️ Редактирать",
-    #             callback_data=CategoryClick(
-    #                 action="edit", category_id=category.id)
-    #         )
-    #         builder.adjust(1, 2)  # Кнопки одна под другой
+@category_router_for_admin.callback_query(F.data == "add_category")
+async def start_add_category(callback: types.CallbackQuery, state: FSMContext):
+    # Запоминаем ID сообщения, которое будем редактировать на протяжении всего процесса
+    await state.update_data(msg_to_edit=callback.message.message_id)
+    await state.set_state(AddCategory.name)
 
-    #         # Отправляем сообщение-карточку
-    #         await callback.message.answer(
-    #             text=(
-    #                 f"🗄 **Категория: {category.name}**\n"
-    #                 f"────────────────────\n"
-    #                 f"\n"
-    #                 f"📊 Всего услуг в базе: {count}\n"
-    #             ),
-    #             reply_markup=builder.as_markup(),
-    #             parse_mode="Markdown"
-    #         )
-    #     await callback.message.answer(
-    #         text="Настройки категорий:",
-    #         reply_markup=button_categories_admin)
+    await callback.message.edit_text(
+        "📝 **Режим добавления**\n\nВведите название для новой категории:",
+        reply_markup=InlineKeyboardBuilder().button(
+            text="❌ Отмена", callback_data="cancel_add").as_markup()
+    )
+    await callback.answer()
 
-    # @category_router_for_admin.callback_query(CategoryClick.filter(F.action == "delete"))
-    # async def ask_delete_confirmation(callback: types.CallbackQuery, callback_data: CategoryClick):
-    #     builder = InlineKeyboardBuilder()
 
-    #     # Кнопка подтверждения и кнопка отмены
-    #     builder.button(
-    #         text="✅ Да, удалить",
-    #         callback_data=CategoryClick(
-    #             action="confirm_delete", category_id=callback_data.category_id)
-    #     )
-    #     builder.button(
-    #         text="❌ Отмена",
-    #         callback_data=CategoryClick(
-    #             action="cancel", category_id=callback_data.category_id)
-    #     )
+@category_router_for_admin.callback_query(ClickCategory.filter(F.pref == "delete"))
+async def ask_delete(callback: types.CallbackQuery, callback_data: ClickCategory):
+    kb = InlineKeyboardBuilder()
+    kb.add(
+        InlineKeyboardButton(text="✅ Да, удалить",
+                             callback_data=ClickCategory(pref="confirm_delete", category_id=callback_data.category_id, page=callback_data.page).pack()),
+        InlineKeyboardButton(text="❌ Отмена",
+                             callback_data=MenuCallBackAdmin(level=2, menu_name="category", page=callback_data.page).pack())
+    )
+    await callback.message.edit_text(f"⚠️ Удалить категорию: {callback_data.category_name}?", reply_markup=kb.as_markup())
 
-    #     await callback.message.edit_text(
-    #         text=f"⚠️ **Вы уверены, что хотите удалить эту категорию?**\nВсе связанные услуги также могут быть затронуты.",
-    #         reply_markup=builder.as_markup(),
-    #         parse_mode="Markdown"
-    #     )
-    #     await callback.answer()
 
-    # @category_router_for_admin.callback_query(CategoryClick.filter(F.action == 'edit'))
-    # async def edit_category(
-    #     callback: types.CallbackQuery,
-    #     callback_data: CategoryClick,
-    #     state: FSMContext,  # Добавляем FSM
-    #     session: AsyncSession
-    # ):
-    #     # 2. Сохраняем ID категории, которую редактируем
-    #     await state.update_data(edit_category_id=callback_data.category_id)
+@category_router_for_admin.callback_query(ClickCategory.filter(F.pref == "confirm_delete"))
+async def delete_cat(callback: types.CallbackQuery, callback_data: ClickCategory, session: AsyncSession):
+    await orm_delete_category(session, callback_data.category_id)
+    await session.commit()
 
-    #     # 3. Устанавливаем состояние ожидания текста
-    #     await state.set_state(AddCategory.name)
+    await callback.answer("Удалено")
 
-    #     await callback.message.answer(
-    #         f"Введите новое название для категории (ID: {callback_data.category_id}):"
-    #     )
+    from .menu_processing import get_menu_content_for_admin
+    content, reply_markup = await get_menu_content_for_admin(session, level=2, menu_name="category", page=callback_data.page)
+    await callback.message.edit_text(text=content, reply_markup=reply_markup)
 
-    #     await callback.answer()
 
-    # @category_router_for_admin.callback_query(CategoryClick.filter(F.action == "confirm_delete"))
-    # async def delete_category_confirmed(callback: types.CallbackQuery, callback_data: CategoryClick, session: AsyncSession):
-    #     # Удаление из БД
+@category_router_for_admin.callback_query(ClickCategory.filter(F.pref == "update"))
+async def edit_cat_start(callback: types.CallbackQuery, callback_data: ClickCategory, state: FSMContext):
+    await state.set_state(AddCategory.name)
+    await state.update_data(
+        edit_category_id=callback_data.category_id,
+        return_page=callback_data.page,
+        msg_to_edit=callback.message.message_id
+    )
 
-    #     await orm_delete_category(session=session, category_id=callback_data.category_id)
-    #     await session.commit()
+    await callback.message.edit_text(
+        f"📝 **Режим редактирования**\n\nВведите новое название для {callback_data.category_name}:",
+        reply_markup=InlineKeyboardBuilder().button(
+            text="❌ Отмена", callback_data="cancel_add").as_markup()
+    )
+    await callback.answer()
 
-    #     await callback.message.edit_text("🗑 Категория успешно удалена.")
-    #     await callback.answer("Удалено")
 
-    # @category_router_for_admin.callback_query(CategoryClick.filter(F.action == "cancel"))
-    # async def cancel_delete(callback: types.CallbackQuery):
+@category_router_for_admin.message(AddCategory.name, F.text)
+async def save_category_logic(message: types.Message, state: FSMContext, session: AsyncSession):
+    data = await state.get_data()
+    msg_id = data.get("msg_to_edit")
+    cat_id = data.get("edit_category_id")
+    page = data.get("return_page", 1)
 
-    #     await callback.message.delete()
-    #     await callback.answer("Действие отменено")
+    # 1. Сначала логика БД и подготовка данных
+    if cat_id:
+        await orm_update_category(session, cat_id, {"name": message.text})
+        success_text = f"✅ Название изменено на «{message.text}»"
+    else:
+        await orm_add_category(session, {"name": message.text})
+        success_text = f"✅ Категория «{message.text}» создана"
+        # Пересчитываем страницу для новой категории
+        categories_all = await orm_get_categories_with_count_services(session)
+        page = len(categories_all)
 
-    # @category_router_for_admin.callback_query(F.data == "add_category")
-    # async def add_category(callback: types.CallbackQuery, state: FSMContext):
-    #     await callback.message.answer('Введите название категории: ', reply_markup=types.ReplyKeyboardRemove())
-    #     await state.set_state(AddCategory.name)
+    await session.commit()
+    await state.clear()
 
-    # @category_router_for_admin.message(AddCategory.name, F.text)
-    # async def save_category_logic(message: types.Message, state: FSMContext, session: AsyncSession):
-    #     if len(message.text) <= 3:
-    #         await message.answer("Название слишком короткое! Введите заново.")
-    #         return
+    # 2. Получаем контент для возврата в меню
+    headline, kb = await category_menu(session, level=2, menu_name="category", page=page)
+    full_text = f"{success_text}\n\n{headline}"
 
-    #     data = await state.get_data()
-    #     category_id = data.get("edit_category_id")
+    # 3. Чистим сообщение пользователя
+    await message.delete()
 
-    #     payload = {"name": message.text}
+    # 4. Бесшовное обновление или отправка нового сообщения
+    if msg_id:
+        try:
+            await message.bot.edit_message_text(
+                chat_id=message.chat.id,
+                message_id=msg_id,
+                text=full_text,
+                reply_markup=kb,
+                parse_mode="Markdown"
+            )
+            return  # Выходим, если успешно отредактировали
+        except Exception:
+            pass  # Если сообщение бота удалено или устарело, переходим к .answer()
 
-    #     try:
-    #         if category_id:
-    #             await orm_update_category(session, category_id, payload)
-    #             await message.answer(f"✅ Название изменено на: **{message.text}**")
-    #         else:
-    #             # ДОБАВЛЕНИЕ
-    #             await orm_add_category(session, payload)
-    #             await message.answer("✅ Категория добавлена", reply_markup=button_categories_admin)
+    # Если msg_id нет или edit_text не сработал
+    await message.answer(full_text, reply_markup=kb, parse_mode="Markdown")
 
-    #         # Финальный коммит, если он не сделан внутри функций
-    #         await state.clear()
 
-    #     except Exception as e:
-    #         # Если снова будет ошибка, мы увидим, на чем именно споткнулся код
-    #         await message.answer(f"Ошибка при сохранении: {e}")
+@category_router_for_admin.callback_query(F.data == "cancel_add")
+async def cancel_add_category(callback: types.CallbackQuery, state: FSMContext, session: AsyncSession):
+    data = await state.get_data()
+    page = data.get("return_page", 1)
+    await state.clear()
+
+    # Просто возвращаем меню категорий в то же сообщение
+    headline, kb = await category_menu(session, level=2, menu_name="category", page=page)
+    await callback.message.edit_text(text=headline, reply_markup=kb, parse_mode="Markdown")
+    await callback.answer("Действие отменено")

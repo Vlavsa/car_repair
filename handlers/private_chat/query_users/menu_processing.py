@@ -52,9 +52,6 @@ async def catalog_menu(session, level, menu_name):
     return image, kbds
 
 
-
-
-
 async def services_menu(session, level, category, page):
     products = await orm_get_services_by_category_id(session=session, category_id=category)
     paginator = Paginator(products, page)
