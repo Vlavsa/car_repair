@@ -37,7 +37,7 @@ category_router_for_admin.message.filter(
     ChatTypeFilter(["private"]), IsAdmin())
 
 
-class ClickCategory(CallbackData, prefix="cat_"):
+class ClickCategory(CallbackData, prefix="category_"):
     pref: str  # "delete", "update", "confirm_delete"
     category_id: int | None = None
     category_name: str | None = None
@@ -80,7 +80,7 @@ async def category_menu(session, level, menu_name, page):
         f"📊 Всего услуг в базе: {count}\n"
     )
 
-    # Получаем кнопки управления и пагинации
+    # Кнопки управления и пагинации
     pagination_btns = pages(paginator)
     kb_builder = get_categories_btns(
         level=level,
@@ -109,13 +109,11 @@ def get_categories_btns(
 ):
     keyboard = InlineKeyboardBuilder()
 
-    # В каждую кнопку управления добавляем текущую страницу page
     keyboard.add(
         InlineKeyboardButton(text="🗑 Удалить", callback_data=ClickCategory(
             category_id=category.id, category_name=category.name, pref="delete", page=page).pack()),
         InlineKeyboardButton(text="✏️ Изменить", callback_data=ClickCategory(
             category_id=category.id, category_name=category.name, pref="update", page=page).pack()),
-        # Для услуг можно использовать menu_name="services"
         InlineKeyboardButton(text="📂 Услуги", callback_data=MenuCallBackAdmin(
             level=level+1, menu_name="services", category_id=category.id).pack())
     )
@@ -137,9 +135,8 @@ def get_categories_btns(
 
     return keyboard
 
+
 # Хендлер добавления категории
-
-
 @category_router_for_admin.callback_query(F.data == "add_category")
 async def start_add_category(callback: types.CallbackQuery, state: FSMContext):
     # Запоминаем ID сообщения, которое будем редактировать на протяжении всего процесса
@@ -147,7 +144,7 @@ async def start_add_category(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(AddCategory.name)
 
     await callback.message.edit_text(
-        "📝 **Режим добавления**\n\nВведите название для новой категории:",
+        "📝 **Режим добавления**\n_____________________\nВведите название для новой категории:",
         reply_markup=InlineKeyboardBuilder().button(
             text="❌ Отмена", callback_data="cancel_add").as_markup()
     )
@@ -201,6 +198,28 @@ async def save_category_logic(message: types.Message, state: FSMContext, session
     msg_id = data.get("msg_to_edit")
     cat_id = data.get("edit_category_id")
     page = data.get("return_page", 1)
+
+    # 1. Проверка длины текста
+    if not (3 <= len(message.text) <= 30):
+        await message.delete()  # Удаляем некорректный ввод юзера
+
+        # Редактируем сообщение бота, добавляя предупреждение
+        error_text = (
+            f"❌ **Ошибка: слишком {'короткое' if len(message.text) < 3 else 'длинное'} название!**\n"
+            f"Должно быть от 3 до 30 символов (сейчас: {len(message.text)})\n\n"
+            "Введите название заново:"
+        )
+
+        if msg_id:
+            await message.bot.edit_message_text(
+                chat_id=message.chat.id,
+                message_id=msg_id,
+                text=error_text,
+                reply_markup=InlineKeyboardBuilder().button(
+                    text="❌ Отмена", callback_data="cancel_add").as_markup(),
+                parse_mode="Markdown"
+            )
+        return  # Выходим из функции, состояние AddCategory.name сохраняется
 
     # 1. Сначала логика БД и подготовка данных
     if cat_id:

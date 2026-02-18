@@ -8,6 +8,7 @@ from database.Banner import orm_get_banner
 from database.Category import orm_get_categories_inner_join_services, orm_get_categories, orm_get_categories_with_count_services
 from database.Service import orm_get_services_by_category_id
 from handlers.private_chat.query_admins.Category import category_menu
+from handlers.private_chat.query_admins.Service import services_menu
 from kbds.inline.main_menu import MenuCallBackAdmin, get_admin_main_btns, get_client_main_btns
 from kbds.inline.inline import get_callback_btns, get_products_btns, get_user_catalog_btns
 
@@ -74,9 +75,7 @@ async def order_menu(session, level, menu_name):
     print(menu_name, level)
 
 
-async def service_menu(session, level, menu_name):
-    print('service_menu')
-    print(menu_name, level)
+
 
 
 async def distributor_menu(session, level, menu_name, category_id, banner_id, page):
@@ -107,7 +106,7 @@ async def get_menu_content_for_admin(
     elif level == 2:
         return await distributor_menu(session, level, menu_name, category_id=category_id, banner_id=banner_id, page=page)
     elif level == 3:
-        return await service_menu(session, level, menu_name, service_id)
+        return await services_menu(session, level, menu_name, service_id, category_id, page)
     elif level == 4:
         return await order_menu(session=session, level=level)
     else:
