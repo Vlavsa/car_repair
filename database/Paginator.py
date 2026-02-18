@@ -49,3 +49,13 @@ class Paginator:
             return self.__get_slice()
         raise IndexError(f'Previous page does not exist. Use has_previous() to check before.')
 
+
+def pages(paginator: Paginator):
+    btns = dict()
+
+    if paginator.has_previous():
+        btns["⬅️ Пред."] = "prev"
+    if paginator.has_next():
+        btns["След. ➡️"] = 'next'
+
+    return btns

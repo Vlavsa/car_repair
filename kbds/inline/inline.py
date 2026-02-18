@@ -65,7 +65,7 @@ def get_products_btns(
             row.append(InlineKeyboardButton(text=text, callback_data=MenuCallBack(
                 level=level, menu_name=menu_name, category=category, page=page + 1).pack()))
         elif menu_name == "prev":
-            row.append(InlineKeyboardButton(text=text, callback_data=MenuCallBack(level=level, menu_name=menu_name, category=category, page=page - 1).pack()))\
+            row.append(InlineKeyboardButton(text=text, callback_data=MenuCallBack(level=level, menu_name=menu_name, category=category, page=page - 1).pack()))
 
     return keyboard.row(*row).as_markup()
 

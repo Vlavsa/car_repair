@@ -2,7 +2,7 @@ from aiogram import types
 from aiogram.types import InputMediaPhoto
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.Paginator import Paginator
+from database.Paginator import Paginator, pages
 from database.Banner import orm_get_banner
 from database.Category import orm_get_categories_inner_join_services
 from database.Service import orm_get_services_by_category_id
@@ -52,15 +52,7 @@ async def catalog_menu(session, level, menu_name):
     return image, kbds
 
 
-def pages(paginator: Paginator):
-    btns = dict()
 
-    if paginator.has_previous():
-        btns["⬅️ Пред."] = "prev"
-    if paginator.has_next():
-        btns["След. ➡️"] = 'next'
-
-    return btns
 
 
 async def services_menu(session, level, category, page):
@@ -75,7 +67,7 @@ async def services_menu(session, level, category, page):
     )
 
     pagination_btns = pages(paginator)
-
+    print(pagination_btns)
     kbds = get_products_btns(
         level=level,
         category=category,

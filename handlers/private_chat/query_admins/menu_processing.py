@@ -7,6 +7,7 @@ from database.Paginator import Paginator
 from database.Banner import orm_get_banner
 from database.Category import orm_get_categories_inner_join_services, orm_get_categories, orm_get_categories_with_count_services
 from database.Service import orm_get_services_by_category_id
+from handlers.private_chat.query_admins.Category import category_menu
 from kbds.inline.main_menu import MenuCallBackAdmin, get_admin_main_btns, get_client_main_btns
 from kbds.inline.inline import get_callback_btns, get_products_btns, get_user_catalog_btns
 
@@ -58,26 +59,6 @@ async def settings_menu(session, level, menu_name):
     return headline, keyboard.adjust(2).as_markup()
 
 
-async def category_menu(session, level, menu_name):
-    categories = await orm_get_categories_with_count_services(session=session)
-    keyboard = InlineKeyboardBuilder()
-    headline = " Настройка категорий: "
-
-    btns = {
-        "Создать": "add_category",
-        '🔙 Назад': 'setting'
-    }
-
-
-    for text, target_menu in btns.items():
-        if menu_name == "setting":
-            keyboard.add(InlineKeyboardButton(text=text, callback_data=MenuCallBackAdmin(
-                level=level-1, menu_name=target_menu).pack()))
-        # keyboard.add(InlineKeyboardButton(text=text, callback_data=MenuCallBackAdmin(
-        #     level=level+1, menu_name=target_menu).pack()))
-    return headline, keyboard.adjust(2).as_markup()
-
-
 async def banner_menu(session, level, menu_name):
     print('banner_menu')
     print(menu_name, level)
@@ -98,30 +79,36 @@ async def service_menu(session, level, menu_name):
     print(menu_name, level)
 
 
-async def distributor_menu(session, level, menu_name):
+async def distributor_menu(session, level, menu_name, category_id, banner_id, page):
     if menu_name == "category":
-        return await category_menu(session=session, level=level, menu_name=menu_name)
+        return await category_menu(session=session, level=level, menu_name=menu_name, page=page)
     elif menu_name == "banner":
         return await banner_menu(session, level, menu_name)
     elif menu_name == "time_work":
         return await time_work_menu(session, level, menu_name)
+    else:
+        return "⚠️ Меню не найдено", None
 
 
 async def get_menu_content_for_admin(
         session: AsyncSession,
         level: int,
         menu_name: str,
-        category: int | None = None,
-        page: int | None = None,
+        category_id: int | None = None,
+        banner_id: int | None = None,
+        service_id: int | None = None,
+        page: int | None = 1,
 ):
 
     if level == 0:
-        print('000000000000000000000000000000000000000000')
         return await main_menu(session, level, menu_name)
     elif level == 1:
-        print('111111111111111111111111111111111111111111')
         return await settings_menu(session, level, menu_name)
     elif level == 2:
-        return await distributor_menu(session, level, menu_name)
+        return await distributor_menu(session, level, menu_name, category_id=category_id, banner_id=banner_id, page=page)
+    elif level == 3:
+        return await service_menu(session, level, menu_name, service_id)
     elif level == 4:
         return await order_menu(session=session, level=level)
+    else:
+        return "❌ Ошибка: уровень меню не определен", None

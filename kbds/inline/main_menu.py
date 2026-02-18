@@ -6,6 +6,10 @@ from aiogram.types import InlineKeyboardButton
 class MenuCallBackAdmin(CallbackData, prefix="admin_menu"):
     level: int
     menu_name: str
+    category_id: int | None = None
+    banner_id: int |None = None
+    service_id: int | None = None
+    page: int | None = 1
 
 class MenuCallBack(CallbackData, prefix="menu"):
     level: int

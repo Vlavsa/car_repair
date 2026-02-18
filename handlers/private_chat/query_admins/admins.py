@@ -44,8 +44,8 @@ async def user_menu(callback: types.CallbackQuery, callback_data: MenuCallBackAd
         session,
         level=callback_data.level,
         menu_name=callback_data.menu_name,
-        # category=callback_data.category,
-        # page=callback_data.page,
+        category_id=callback_data.category_id,
+        page=callback_data.page,
     )
 
     if callback.message.text and isinstance(media, types.InputMediaPhoto):
@@ -79,52 +79,52 @@ async def user_menu(callback: types.CallbackQuery, callback_data: MenuCallBackAd
 
 
 
-@admin_router.callback_query(F.data == 'exit')
-async def exit_menu(callback: types.CallbackQuery, session: AsyncSession):
-    try:
-        await callback.message.delete()
-        await callback.answer()
-        return await callback.message.answer('Буду ждать твоего возвращения!!!', reply_markup=types.ReplyKeyboardRemove())
-    except TelegramBadRequest as e:
-        print(e)
+# @admin_router.callback_query(F.data == 'exit')
+# async def exit_menu(callback: types.CallbackQuery, session: AsyncSession):
+#     try:
+#         await callback.message.delete()
+#         await callback.answer()
+#         return await callback.message.answer('Буду ждать твоего возвращения!!!', reply_markup=types.ReplyKeyboardRemove())
+#     except TelegramBadRequest as e:
+#         print(e)
 
 
-@admin_router.callback_query(F.data == 'prev_menu')
-async def settings_menu(callback: types.CallbackQuery, session: AsyncSession):
-    await callback.answer()
-    await callback.message.edit_text(
-        text="Главное меню админа:",
-        reply_markup=buttons_start_admin)
+# @admin_router.callback_query(F.data == 'prev_menu')
+# async def settings_menu(callback: types.CallbackQuery, session: AsyncSession):
+#     await callback.answer()
+#     await callback.message.edit_text(
+#         text="Главное меню админа:",
+#         reply_markup=buttons_start_admin)
 
 
-@admin_router.callback_query(F.data == 'prev_settings')
-async def prev_menu_2(callback: types.CallbackQuery, session: AsyncSession):
-    await callback.answer()
-    await callback.message.edit_text(
-        text="Настройки администратора:",
-        reply_markup=button_settings_admin)
+# @admin_router.callback_query(F.data == 'prev_settings')
+# async def prev_menu_2(callback: types.CallbackQuery, session: AsyncSession):
+#     await callback.answer()
+#     await callback.message.edit_text(
+#         text="Настройки администратора:",
+#         reply_markup=button_settings_admin)
 
 
-@admin_router.callback_query(F.data == 'settings')
-async def settings_menu(callback: types.CallbackQuery, session: AsyncSession):
-    await callback.answer()
-    await callback.message.edit_text(
-        text="Настройки администратора:",
-        reply_markup=button_settings_admin)
+# @admin_router.callback_query(F.data == 'settings')
+# async def settings_menu(callback: types.CallbackQuery, session: AsyncSession):
+#     await callback.answer()
+#     await callback.message.edit_text(
+#         text="Настройки администратора:",
+#         reply_markup=button_settings_admin)
 
 
-@admin_router.callback_query(F.data == 'recording')
-async def recording_menu(callback: types.CallbackQuery, session: AsyncSession):
-    await callback.answer()
-    return await callback.message.answer("Работаю над расписанием))")
+# @admin_router.callback_query(F.data == 'recording')
+# async def recording_menu(callback: types.CallbackQuery, session: AsyncSession):
+#     await callback.answer()
+#     return await callback.message.answer("Работаю над расписанием))")
 
 
-@admin_router.callback_query(F.data == 'prev_category')
-async def prev_menu_2(callback: types.CallbackQuery, session: AsyncSession):
-    await callback.answer()
-    await callback.message.edit_text(
-        text="Настройка категорий:",
-        reply_markup=button_categories_admin)
+# @admin_router.callback_query(F.data == 'prev_category')
+# async def prev_menu_2(callback: types.CallbackQuery, session: AsyncSession):
+#     await callback.answer()
+#     await callback.message.edit_text(
+#         text="Настройка категорий:",
+#         reply_markup=button_categories_admin)
 
 
 admin_router.include_routers(
