@@ -1,7 +1,8 @@
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from aiogram import F, Router, types
 
-from aiogram.types import InlineKeyboardButton
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.types import InlineKeyboardButton, InputMediaPhoto
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.filters import Command, StateFilter, or_f
@@ -10,6 +11,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
 from database.Paginator import Paginator, pages
+from handlers.private_chat.query_admins.Category import category_menu
 from kbds.inline.categories_admin import CategoryClick
 from kbds.inline.inline import get_callback_btns, button_service_admin, button_categories_admin
 from kbds.inline.main_menu import MenuCallBackAdmin
@@ -43,6 +45,7 @@ class ClickService(CallbackData, prefix="service_"):
     pref: str  # delete, update, confirm_delete
     category_id: int | None = None
     service_id: int | None = None
+    service_name: str | None = None
     page: int | None = 1
 
 
@@ -67,7 +70,7 @@ async def services_menu(
     if not services:
         kb = InlineKeyboardBuilder()
         kb.row(types.InlineKeyboardButton(text='➕ Добавить услугу',
-               callback_data=ClickService(pref="add", category_id=category_id).pack()))
+               callback_data=ClickService(pref="add_service", category_id=category_id).pack()))
         kb.row(types.InlineKeyboardButton(text='🔙 Назад',
                callback_data=MenuCallBackAdmin(level=level-1, menu_name='category').pack()))
         return "📂 Услуг в этой категории пока нет", kb.as_markup()
@@ -101,11 +104,11 @@ async def services_menu(
     kb = InlineKeyboardBuilder()
     # Добавляем кнопку возврата к категориям
     kb.row(types.InlineKeyboardButton(text='➕ Добавить услугу',
-               callback_data=ClickService(pref="add", category_id=category_id).pack()))
+                                      callback_data=ClickService(pref="add_service", category_id=category_id).pack()))
     kb.row(types.InlineKeyboardButton(text='🔙 К категориям',
-                   callback_data=MenuCallBackAdmin(level=2, menu_name='category').pack()))
+                                      callback_data=MenuCallBackAdmin(level=2, menu_name='category').pack()))
     kb.adjust(*(2,))
-    kb_builder.attach(kb) 
+    kb_builder.attach(kb)
 
     return media, kb_builder.as_markup()
 
@@ -120,17 +123,16 @@ def get_services_btns(
 ):
     keyboard = InlineKeyboardBuilder()
 
-    # ОБЯЗАТЕЛЬНО передаем category_id, чтобы не терять контекст
     keyboard.add(
         InlineKeyboardButton(text="🗑 Удалить", callback_data=ClickService(
-            service_id=service.id, 
-            category_id=service.category_id, 
-            pref="delete", 
+            service_id=service.id,
+            category_id=service.category_id,
+            pref="delete",
             page=page).pack()),
         InlineKeyboardButton(text="✏️ Изменить", callback_data=ClickService(
-            service_id=service.id, 
-            category_id=service.category_id, 
-            pref="update", 
+            service_id=service.id,
+            category_id=service.category_id,
+            pref="update",
             page=page).pack()),
     )
 
@@ -141,262 +143,380 @@ def get_services_btns(
     for text, action in pagination_btns.items():
         # Вычисляем целевую страницу
         target_page = page + 1 if action == "next" else page - 1
-        
+
         nav_row.append(InlineKeyboardButton(
-            text=text, 
+            text=text,
             callback_data=MenuCallBackAdmin(
-                level=level, 
-                menu_name="services", 
+                level=level,
+                menu_name="services",
                 category_id=service.category_id,
                 page=target_page
             ).pack()
         ))
-        
+
     if nav_row:
         keyboard.row(*nav_row)
 
     return keyboard
 
-# @service_router_for_admin.callback_query(CategoryClick.filter(F.action == "category_"))
-# async def starring_at_service(callback: types.CallbackQuery, session: AsyncSession, callback_data: CategoryClick, state: FSMContext):
-#     category_id = callback_data.category_id
-#     query = await orm_get_services_by_category_id(session=session, category_id=int(category_id))
 
-#     await state.clear()
-#     await state.update_data(category=category_id)
+async def edit_smart(message: types.Message, msg_id: int, text: str, keyboard=None):
+    if keyboard:
+        kb = keyboard
+    else:
+        kb = InlineKeyboardBuilder().button(
+            text="❌ Отмена", callback_data="cancel_add_service").as_markup()
 
-#     if not query or len(query) < 1:
-#         await callback.answer()
-#         return await callback.message.answer('Список пуст....', reply_markup=button_service_admin)
+    try:
 
-#     await callback.message.delete()
-#     await callback.answer()
-
-#     for service in query:
-#         await callback.message.answer_photo(
-#             service.image,
-#             caption=f"<strong>{service.name}\
-#                     </strong>\n{service.description}\nСтоимость: {round(service.price, 2)}",
-#             reply_markup=get_callback_btns(
-#                 btns={
-#                     "Удалить": f"delete_{service.id}",
-#                     "Изменить": f"change_{service.id}",
-#                 },
-#                 sizes=(2,)
-#             ),
-#         )
-#     await callback.answer()
-#     await callback.message.answer("ОК, вот список товаров ⏫", reply_markup=button_service_admin)
+        await message.bot.edit_message_text(chat_id=message.chat.id, message_id=msg_id, text=text, reply_markup=kb, parse_mode="Markdown")
+    except TelegramBadRequest:
+        try:
+            await message.bot.edit_message_caption(chat_id=message.chat.id, message_id=msg_id, caption=text, reply_markup=kb, parse_mode="Markdown")
+        except TelegramBadRequest:
+            pass
 
 
-# @service_router_for_admin.callback_query(F.data.startswith("delete_"))
-# async def delete_service_callback(callback: types.CallbackQuery, session: AsyncSession):
-#     product_id = callback.data.split("_")[-1]
-#     await orm_delete_service_by_id(session, int(product_id))
+@service_router_for_admin.callback_query(ClickService.filter(F.pref == "delete"))
+async def ask_service(callback: types.CallbackQuery, callback_data: ClickService, session: AsyncSession):
+    kb = InlineKeyboardBuilder()
 
-#     await callback.answer("Услуга удалена")
-#     await callback.message.answer("Услуга удалена!")
-#     return await callback.message.delete()
+    kb.add(InlineKeyboardButton(
+        text="✅ Да, удалить", callback_data=ClickService(
+            pref="confirm_delete", category_id=callback_data.category_id, service_id=callback_data.service_id,  service_name=callback_data.service_name, page=callback_data.page
+        ).pack()),
+        InlineKeyboardButton(
+        text="❌ Отмена", callback_data=MenuCallBackAdmin(
+            level=3, menu_name="services", category_id=callback_data.category_id, page=callback_data.page
+        ).pack()))
+    text = f"⚠️ Удалить услугу: {callback_data.service_name}?"
+    try:
 
-
-# # Становимся в состояние ожидания ввода name
-
-
-# @service_router_for_admin.callback_query(StateFilter(None), F.data.startswith("change_"))
-# async def change_service_callback(callback: types.CallbackQuery, state: FSMContext, session: AsyncSession):
-#     service_id = int(callback.data.split("_")[-1])
-#     service_for_change = await orm_get_service_by_id(session, service_id)
-
-#     # Сохраняем данные услуги в state, чтобы они были доступны во всех хендлерах
-#     await state.update_data(
-#         service_id=service_for_change.id,
-#         old_name=service_for_change.name,
-#         old_description=service_for_change.description,
-#         old_category=service_for_change.category,
-#         old_price=service_for_change.price,
-#         old_image=service_for_change.image
-#     )
-
-#     await callback.answer()
-#     await callback.message.answer(
-#         f"Меняем: {service_for_change.name}\nВведите новое название или '.'",
-#         reply_markup=types.ReplyKeyboardRemove()
-#     )
-#     await state.set_state(AddService.name)
+        await callback.message.edit_caption(caption=text, reply_markup=kb.as_markup())
+    except TelegramBadRequest:
+        await callback.message.delete()
+        await callback.message.answer(text, reply_markup=kb.as_markup())
 
 
-# # Становимся в состояние ожидания ввода name
-# @service_router_for_admin.callback_query(F.data == "add_service")
-# async def add_service(callback: types.CallbackQuery, state: FSMContext):
-#     await callback.answer()
-#     await callback.message.answer(
-#         "Введите название услуги", reply_markup=types.ReplyKeyboardRemove()
-#     )
-#     await state.set_state(AddService.name)
+@service_router_for_admin.callback_query(ClickService.filter(F.pref == "confirm_delete"))
+async def delete_service(callback: types.CallbackQuery, callback_data: ClickService, session: AsyncSession):
+
+    await orm_delete_service_by_id(session=session, service_id=callback_data.service_id)
+
+    await session.commit()
+    await callback.answer("Удалено")
+
+    from .menu_processing import get_menu_content_for_admin
+
+    content, reply_markup = await get_menu_content_for_admin(
+        session=session, level=3, menu_name="services", page=callback_data.page, category_id=callback_data.category_id
+    )
+
+    if isinstance(content, types.InputMediaPhoto):
+        try:
+
+            await callback.message.edit_media(media=content, reply_markup=reply_markup)
+
+        except TelegramBadRequest:
+            await callback.message.delete()
+            await callback.message.answer_photo(photo=content.media, caption=content.caption, reply_markup=reply_markup)
+    else:
+
+        try:
+            await callback.message.edit_text(text=content, reply_markup=reply_markup)
+
+        except TelegramBadRequest:
+            await callback.message.delete()
+            await callback.message.answer(text=content, reply_markup=reply_markup)
 
 
-# @service_router_for_admin.message(AddService.name)
-# async def add_name(message: types.Message, state: FSMContext):
-#     if len(message.text) > 150:
-#         return await message.answer("Название слишком длинное (макс. 150 симв.)")
+@service_router_for_admin.callback_query(ClickService.filter(F.pref == "add_service"))
+async def start_add_service(callback: types.CallbackQuery, callback_data: ClickService, session: AsyncSession, state: FSMContext):
+    await state.update_data(msg_to_edit=callback.message.message_id, return_page=callback_data.page, old_category_id=callback_data.category_id)
+    await state.set_state(AddService.name)
 
-#     data = await state.get_data()
-#     service_id = data.get("service_id")
+    text = "📝 **Режим добавления**\n_____________________\nВведите название для новой услуги:"
+    kb = InlineKeyboardBuilder().button(
+        text="❌ Отмена", callback_data="cancel_add_service").as_markup()
 
-#     if message.text == "." and service_id:
-#         await state.update_data(name=data.get("old_name"))
-#     else:
-#         if not (5 <= len(message.text) <= 150):
-#             return await message.answer("Описание должно быть от 5 до 150 символов.")
-#         await state.update_data(name=message.text)
+    try:
 
-#     if service_id:
-#         await message.answer(f"Старое описание: {data.get('old_description')}\nВведите новое или '.'")
-#     else:
-#         await message.answer("Введите описание услуги:")
+        url = "https://upload.wikimedia.org/wikipedia/commons/2/28/Beelden_in_Leiden_2016_04_crop.jpg"
 
-#     await state.set_state(AddService.description)
+        media = InputMediaPhoto(
+            media=url,
+            caption=text,
+            parse_mode="Markdown"
+        )
 
-# # Ловим description
-
-
-# @service_router_for_admin.message(AddService.description)
-# async def add_description(message: types.Message, state: FSMContext):
-#     data = await state.get_data()
-#     service_id = data.get("service_id")
-
-#     if message.text == "." and service_id:
-#         await state.update_data(description=data.get("old_description"))
-#     else:
-#         # Исправленная проверка длины
-#         if not (5 <= len(message.text) <= 150):
-#             return await message.answer("Описание должно быть от 5 до 150 символов.")
-#         await state.update_data(description=message.text)
-
-#     if service_id:
-#         await message.answer(f"Старая цена: {data.get('old_price')}\nВведите новую или '.'")
-#     else:
-#         await message.answer("Введите цену услуги:")
-
-#     await state.set_state(AddService.price)
+        # ЗАМЕНЯЕМ медиа и текст одновременно
+        await callback.message.edit_media(media=media, reply_markup=kb)
+    except TelegramBadRequest:
+        # Если сообщение было без фото (текстовое), edit_media не сработает
+        try:
+            # Удаляем старое текстовое и шлем новое с фото
+            await callback.message.delete()
+            new_msg = await callback.message.answer_photo(photo=url, caption=text, reply_markup=kb)
+            await state.update_data(msg_to_edit=new_msg.message_id)
+        except TelegramBadRequest:
+            # Если совсем всё упало — просто шлем новое фото
+            new_msg = await callback.message.answer_photo(photo=url, caption=text, reply_markup=kb)
+            await state.update_data(msg_to_edit=new_msg.message_id)
 
 
-# @service_router_for_admin.message(AddService.price, or_f(F.text, F.text == "."))
-# async def add_price(message: types.Message, state: FSMContext, session: AsyncSession):
-#     data = await state.get_data()
-#     service_id = data.get("service_id")
-#     category = data.get('category')
-#     print('_____________________________________________________________')
-#     print(category)
-#     # 1. Если ввели точку при редактировании
-#     if message.text == "." and service_id:
-#         old_price = data.get("old_price")
+@service_router_for_admin.callback_query(F.data == "cancel_add_service")
+async def cancel_add_service(callback: types.CallbackQuery, state: FSMContext, session: AsyncSession):
+    data = await state.get_data()
+    page = data.get("return_page", 1)
+    category_id = data.get("old_category_id") or data.get("category")
 
-#         # Безопасно сохраняем как число
-#         await state.update_data(price=old_price)
-#         await message.answer("Цена оставлена прежней. Будете менять фото? Отправьте новое или '.'")
-#         await state.set_state(AddService.image)
-#         return
+    await state.clear()
 
-#     # 2. Если это ввод новой цены (или создание новой услуги)
-#     price_text = message.text.replace(" ", "").replace(",", ".")
+    from .menu_processing import get_menu_content_for_admin
+    content, reply_markup = await get_menu_content_for_admin(
+        session=session, level=3, menu_name="services", category_id=category_id, page=page
+    )
 
-#     try:
-
-#         price_val = Decimal(price_text)
-#         if -1 >  price_val > 999999:
-#             return await message.answer("Число не может быть больше 999 999 или меньше 0")
+    if isinstance(content, types.InputMediaPhoto):
+        await callback.message.edit_media(media=content, reply_markup=reply_markup)
+    else:
+        await callback.message.edit_text(text=content, reply_markup=reply_markup)
 
 
-#         await state.update_data(price=price_val)
+@service_router_for_admin.message(AddService.name, or_f(F.text == ".", F.text))
+async def add_service_name(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    service_id = data.get("old_service_id", None)
+    msg_id = data.get("msg_to_edit")
 
-#         if service_id:
-#             await message.answer("Цена обновлена. Выберите категорию или '.'")
-#             await state.set_state(AddService.category)
-#         else:
-#             if category:
-#                 await message.answer("Теперь загрузите фотографию")
-#                 await state.set_state(AddService.image)
-#             else:
-#                 categories = await orm_get_categories(session=session)
-#                 categories_data = {cat.name: f"cat_{cat.id}" for cat in categories}
-#                 await message.answer("Теперь выберите категорию", reply_markup=get_callback_btns(btns=categories_data, sizes=(2,)))
-#                 await state.set_state(AddService.category)
+    await message.delete()
 
-#     except Exception as e:
-#         await message.answer(
-#             f"Введите корректное число (по типу 500.00 или 5000,00)")
-#         print(e)
+    if message.text == "." and service_id:
+        new_name = data.get("old_name")
+    else:
+        if not (3 <= len(message.text) <= 30):
+            error_text = (
+                f"❌ **Ошибка: слишком {'короткое' if len(message.text) < 3 else 'длинное'} название!**\n"
+                f"Должно быть от 3 до 30 символов (сейчас: {len(message.text)})\n\n"
+                f"Введите название заново {'или "."' if service_id else ''}:"
+            )
+            return await edit_smart(message, msg_id, error_text)
+        new_name = message.text
 
-# @service_router_for_admin.callback_query(AddService.category, or_f(F.data.startswith('cat_'), F.text == "."))
-# async def add_categories_for_service(callback: types.CallbackQuery, session: AsyncSession, state: FSMContext):
-#     if callback.data == ".":
+    await state.update_data(name=new_name)
+    await state.set_state(AddService.description)
 
-#         data = await state.get_data()
-#         id_category = data.get("old_category")
-#         await state.update_data(category=id_category)
-#         await callback.message.answer("Теперь добавить фотографию")
-#         await callback.answer()
-#         await state.set_state(AddService.image)
+    next_text = f"✅ Название: **{new_name}**\n\n📝 Теперь введите **описание** услуги {'или "."' if service_id else ''}:"
+    await edit_smart(message, msg_id, next_text)
 
 
-#     id_category = int(callback.data.split('_')[-1])
-#     category =  await orm_check_category_by_id(session=session, id_category=id_category)
+@service_router_for_admin.message(AddService.description, or_f(F.text == ".", F.text))
+async def add_service_description(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    msg_id = data.get("msg_to_edit")
+    service_id = data.get("old_service_id", None)
 
-#     if not category:
-#             categories = await orm_get_categories(session=session)
-#             categories_data = {cat.name: f"cat_{cat.id}" for cat in categories}
-#             await callback.message.answer("Выберите категорию из доступных", reply_markup=get_callback_btns(btns=categories_data, sizes=(2,)))
-#             await callback.answer()
-#             return
+    await message.delete()
 
-#     await state.update_data(category=id_category)
-#     await callback.message.answer("Теперь добавить фотографию")
-#     await callback.answer()
-#     await state.set_state(AddService.image)
+    if message.text == "." and service_id:
+        new_description = data.get("old_description")
+    else:
+        if len(message.text) >= 300:
+            error_text = (
+                f"❌ **Ошибка: слишком длинное описание!**\n"
+                f"Должно быть до 300 символов (сейчас: {len(message.text)})\n\n"
+                f"Введите описание заново {'или "."' if service_id else ''}:"
+            )
+            return await edit_smart(message=message, msg_id=msg_id, text=error_text)
+        new_description = message.text
+
+    await state.update_data(description=new_description)
+    await state.set_state(AddService.price)
+
+    next_text = (
+        f"✅ Описание принято.\n\n"
+        f"💰 Теперь введите **цену** услуги (число) {'. если оставить прежнюю' if service_id else ''}:"
+    )
+    await edit_smart(message, msg_id, next_text)
 
 
-# @service_router_for_admin.message(AddService.image, or_f(F.photo, F.text == "."))
-# async def add_image(message: types.Message, state: FSMContext, session: AsyncSession):
-#     data = await state.get_data()
-#     print(f"DEBUG: Функция дошла до конца! Входящие данные: {data}")
-#     # Проверяем, редактируем ли мы или создаем
-#     service_id = data.get("service_id")
+@service_router_for_admin.message(AddService.price, or_f(F.text == ".", F.text))
+async def add_service_price(message: types.Message, state: FSMContext, session: AsyncSession):
+    data = await state.get_data()
+    msg_id = data.get("msg_to_edit")
+    service_id = data.get("old_service_id")
+    category_id = data.get("old_category_id")
 
-#     # 1. Определяем, какое изображение использовать
-#     if message.text == ".":
-#         if service_id:
-#             # Если точка при редактировании — берем старое фото
-#             image_to_save = data.get("old_image")
-#         else:
-#             return await message.answer("При добавлении новой услуги нельзя ставить точку. Отправьте фото.")
-#     elif message.photo:
-#         # Если прислали новое фото — берем его
-#         image_to_save = message.photo[-1].file_id
-#     else:
-#         return await message.answer("Пожалуйста, отправьте фото услуги или '.' для сохранения старого.")
+    await message.delete()
 
-#     # Обновляем data финальным фото
-#     await state.update_data(image=image_to_save)
+    # 1. Обработка пропуска (точка)
+    if message.text == "." and service_id:
+        price_val = data.get("old_price")
+    else:
 
-#     # 2. Получаем все накопленные данные из FSM
-#     final_data = await state.get_data()
-#     print(final_data)
-#     try:
-#         if service_id:
-#             # Если есть ID — вызываем UPDATE
-#             await orm_update_service_by_id(session, service_id, final_data)
-#             await message.answer("Услуга успешно обновлена!", reply_markup=button_service_admin)
-#         else:
-#             # Если ID нет — вызываем INSERT
-#             await orm_add_service(session, final_data)
-#             await message.answer("Услуга успешно добавлена!", reply_markup=button_service_admin)
+        try:
+            price_text = message.text.replace(" ", "").replace(",", ".")
+            price_val = Decimal(price_text)
 
-#         # 3. Обязательно очищаем состояние
-#         await state.clear()
+            max_val = Decimal("9999999")
+            min_val = Decimal("0")
 
-#     except Exception as e:
-#         print(e)
-#         await message.answer(
-#             f"Отправьте корректно изображиние..."
-#         )
+            if not (min_val <= price_val <= max_val) or len(price_text) > 10:
+                reason = " больше лимита" if price_val > max_val else " меньше нуля"
+                if len(price_text) > 10:
+                    reason = " слишком длинное"
+
+                error_text = (
+                    f"❌ **Ошибка: Число{reason} ₽**\n"
+                    f"Допустимо: от **0** до **9 999 999** ₽\n\n"
+                    f"Введите цену заново{' или \".\"' if service_id else ''}:"
+                )
+                return await edit_smart(message=message, msg_id=msg_id, text=error_text)
+
+        except (InvalidOperation, ValueError):
+            error_text = "❌ **Ошибка!** Введите корректное число (например: 500 или 1250.50):"
+            return await edit_smart(message=message, msg_id=msg_id, text=error_text)
+
+    await state.update_data(price=float(price_val))
+
+    if category_id:
+        await state.set_state(AddService.image)
+        next_text = (
+            f"✅ Цена: **{price_val:,} руб.**\n\n".replace(",", " ") +
+            f"📸 Отправьте **фотографию** услуги{' или \".\" чтобы оставить текущую' if service_id else ''}:"
+        )
+        await edit_smart(message, msg_id, next_text)
+    else:
+
+        await state.set_state(AddService.category)
+
+        categories = await orm_get_categories(session=session)
+
+        if not categories:
+            await edit_smart(message, msg_id, "❌ Сначала создайте хотя бы одну категорию!")
+            return
+
+        kb_builder = InlineKeyboardBuilder()
+        for cat in categories:
+
+            kb_builder.button(
+                text=cat.name,
+                callback_data=f"fsm_cat_{cat.id}"
+            )
+
+        kb_builder.adjust(2)
+        # Добавляем кнопку отмены вниз
+        kb_builder.row(types.InlineKeyboardButton(
+            text="❌ Отмена", callback_data="cancel_add_service"))
+
+        next_text = (
+            f"✅ Цена: **{price_val:,} руб.**\n\n".replace(",", " ") +
+            "📂 Выберите **категорию** для этой услуги:"
+        )
+
+        # 4. Вызываем редактирование с новой клавиатурой
+        await edit_smart(
+            message=message,
+            msg_id=msg_id,
+            text=next_text,
+            keyboard=kb_builder.as_markup()
+        )
+
+
+@service_router_for_admin.callback_query(AddService.category, F.data.startswith("fsm_cat_"))
+async def add_service_category_choice(callback: types.CallbackQuery, state: FSMContext):
+
+    category_id = int(callback.data.replace("fsm_cat_", ""))
+
+    await state.update_data(category=category_id)
+    await state.set_state(AddService.image)
+
+    text = "📂 Категория выбрана.\n\n📸 Теперь отправьте **фотографию** услуги:"
+
+    await edit_smart(callback.message, callback.message.message_id, text)
+    await callback.answer()
+
+
+# 1. Хендлер для загрузки НОВОГО фото
+@service_router_for_admin.message(AddService.image, F.photo)
+async def add_service_image(message: types.Message, state: FSMContext, session: AsyncSession):
+    # Берем самое качественное фото (последнее в списке)
+    photo_id = message.photo[-1].file_id
+    await state.update_data(image=photo_id)
+
+    await message.delete()
+    await proceed_to_save(message, state, session)
+
+# 2. Хендлер для ПРОПУСКА фото (точка)
+
+
+@service_router_for_admin.message(AddService.image, F.text == ".")
+async def skip_service_image(message: types.Message, state: FSMContext, session: AsyncSession):
+    data = await state.get_data()
+
+    if not data.get("old_service_id"):
+        # Если это новая услуга, точку ставить нельзя
+        return await edit_smart(message, data.get("msg_to_edit"), "❌ Для новой услуги фото обязательно! Отправьте изображение:")
+
+    await state.update_data(image=data.get("old_image"))
+    await message.delete()
+    await proceed_to_save(message, state, session)
+
+# 3. Функция сохранения (чтобы не дублировать код)
+
+
+async def proceed_to_save(message: types.Message, state: FSMContext, session: AsyncSession):
+    data = await state.get_data()
+    msg_id = data.get("msg_to_edit")
+    service_id = data.get("old_service_id")
+
+    try:
+        if service_id:
+            # ЛОГИКА ОБНОВЛЕНИЯ (ORM)
+            await orm_update_service_by_id(session, service_id, data)
+            text = "✅ Услуга успешно обновлена!"
+        else:
+            # ЛОГИКА ДОБАВЛЕНИЯ (ORM)
+            await orm_add_service(session, data)
+            text = "✅ Услуга успешно добавлена!"
+
+        await session.commit()
+        await state.clear()
+
+        # Кнопка возврата в меню
+        kb = InlineKeyboardBuilder().button(text="🔙 К списку услуг", callback_data=MenuCallBackAdmin(level=3,
+                                                                                                     menu_name="services", category_id=data.get("old_category_id", data.get("category")), page=1)).as_markup()
+
+        await edit_smart(message, msg_id, text, keyboard=kb)
+
+    except Exception as e:
+        await session.rollback()
+        await edit_smart(message, msg_id, f"❌ Ошибка при сохранении: {str(e)}")
+
+
+@service_router_for_admin.callback_query(ClickService.filter(F.pref == "update"))
+async def start_update_service(callback: types.CallbackQuery, callback_data: ClickService, session: AsyncSession, state: FSMContext):
+    # Получаем текущие данные услуги из БД
+    service = await orm_get_service_by_id(session, callback_data.service_id)
+
+    # Заполняем state старыми данными, чтобы работала "точка" (.)
+    await state.update_data(
+        old_service_id=service.id,
+        old_name=service.name,
+        old_description=service.description,
+        old_price=service.price,
+        old_image=service.image,
+        old_category_id=service.category_id,
+        msg_to_edit=callback.message.message_id,
+        return_page=callback_data.page
+    )
+
+    await state.set_state(AddService.name)
+    text = f"✏️ **Редактирование: {service.name}**\n\nВведите новое название или '.' чтобы оставить прежнее:"
+
+    # Используем edit_caption, так как при клике на "Изменить" у нас уже есть фото услуги
+    await callback.message.edit_caption(
+        caption=text,
+        reply_markup=InlineKeyboardBuilder().button(
+            text="❌ Отмена", callback_data="cancel_add_service").as_markup()
+    )

@@ -146,7 +146,7 @@ async def start_add_category(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
         "📝 **Режим добавления**\n_____________________\nВведите название для новой категории:",
         reply_markup=InlineKeyboardBuilder().button(
-            text="❌ Отмена", callback_data="cancel_add").as_markup()
+            text="❌ Отмена", callback_data="cancel_add_category").as_markup()
     )
     await callback.answer()
 
@@ -216,7 +216,7 @@ async def save_category_logic(message: types.Message, state: FSMContext, session
                 message_id=msg_id,
                 text=error_text,
                 reply_markup=InlineKeyboardBuilder().button(
-                    text="❌ Отмена", callback_data="cancel_add").as_markup(),
+                    text="❌ Отмена", callback_data="cancel_add_category").as_markup(),
                 parse_mode="Markdown"
             )
         return  # Выходим из функции, состояние AddCategory.name сохраняется
@@ -260,7 +260,7 @@ async def save_category_logic(message: types.Message, state: FSMContext, session
     await message.answer(full_text, reply_markup=kb, parse_mode="Markdown")
 
 
-@category_router_for_admin.callback_query(F.data == "cancel_add")
+@category_router_for_admin.callback_query(F.data == "cancel_add_category")
 async def cancel_add_category(callback: types.CallbackQuery, state: FSMContext, session: AsyncSession):
     data = await state.get_data()
     page = data.get("return_page", 1)
