@@ -7,9 +7,10 @@ class MenuCallBackAdmin(CallbackData, prefix="admin_menu"):
     level: int
     menu_name: str
     category_id: int | None = None
-    banner_id: int |None = None
+    banner_id: int | None = None
     service_id: int | None = None
     page: int | None = 1
+
 
 class MenuCallBack(CallbackData, prefix="menu"):
     level: int
@@ -53,15 +54,13 @@ def get_admin_main_btns(
 ):
     keyboard = InlineKeyboardBuilder()
     btns = {
-        "⚙️ Настройки": "setting",
+        "⚙️ Настройки": "settings",
         "Записи": "order",
         "Выход": "exit",
 
     }
     for text, menu_name in btns.items():
-        if menu_name == 'setting':
-            print('setting')
-            print(text, level+1, menu_name)
+        if menu_name == 'settings':
             keyboard.add(InlineKeyboardButton(text=text,
                                               callback_data=MenuCallBackAdmin(level=level+1, menu_name=menu_name).pack()))
 
@@ -73,5 +72,3 @@ def get_admin_main_btns(
             keyboard.add(InlineKeyboardButton(text=text,
                                               callback_data=MenuCallBackAdmin(level=level, menu_name=menu_name).pack()))
     return keyboard.adjust(*sizes).as_markup()
-
-

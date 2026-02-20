@@ -3,12 +3,15 @@ from aiogram import F, Router, types
 
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.filters import Command, StateFilter, or_f
+from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
 from callback.banner_admins_btns import BannerClick
+from database.Paginator import Paginator, pages
 from kbds.inline.inline import get_callback_btns
+from kbds.inline.main_menu import MenuCallBackAdmin
 from kbds.reply import get_keyboard, ADMIN_KB
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +41,86 @@ class AddBanner(StatesGroup):
     description = State()
     banner_for_change = {}
 
+class ClickBanner(CallbackData, prefix="banner_"):
+    pref: str # update
+    banner_id: int
+    page: int | None = 1
+
+async def banner_menu(session, level, menu_name, page):
+    banners = await orm_get_banners(session=session)
+    
+    kb_builder = InlineKeyboardBuilder()
+
+    kb_builder.add(types.InlineKeyboardButton(text="🔙 Назад", callback_data=MenuCallBackAdmin(
+        level=level-1, menu_name="settings").pack()))
+
+    if not banners:
+        headline = "Баннеры не работают, звони Владу!!!"
+        return headline, kb_builder.adjust(1).as_markup()
+    
+
+    paginator = Paginator(banners, page=page)
+    if not paginator.get_page():
+        page = paginator.pages
+        paginator = Paginator(banners, page=page)
+    
+    current_banner = paginator.get_page()[0]
+    pagination_btns = pages(paginator=paginator)
+    image_warning = "" if current_banner.image else "⚠️ Добавьте фото для этого баннера!\n\n"
+    caption = (
+        f"{image_warning}"
+        f"🖼 **Баннер: {current_banner.name}**\n"
+        f"_____________________\n"
+        f"📝 {current_banner.description or 'Описание отсутствует'}"
+    )
+    if current_banner.image:
+        media = types.InputMediaPhoto(
+            media=current_banner.image,
+            caption=caption,
+            parse_mode="Markdown"
+        )
+    else:
+        media = caption
+
+    kb_b = await get_banners_btns(level=level, menu_name=menu_name, banner=current_banner, pagination_btns=pagination_btns, page=page)
+    kb_builder.attach(kb_b)
+
+    return media, kb_builder
+
+async def get_banners_btns(
+        *,
+        level: int,
+        page: int,
+        menu_name: str,
+        banner: object,
+        pagination_btns: dict,
+        sizes: tuple[int] = (2,),
+):
+    kb_builder = InlineKeyboardBuilder()
+
+    kb_builder.button(text="✏️ Изменить", callback_data=ClickBanner(pref="update", banner_id=banner.id, page=page))
+    kb_builder.adjust(*sizes)
+
+    
+    nav_row = []
+
+    for text, action in pagination_btns.items():
+        target_page = page + 1 if action == "next" else page - 1
+
+        nav_row.append(types.InlineKeyboardButton(
+            text=text,
+            callback_data=MenuCallBackAdmin(
+                level = level,
+                menu_name= menu_name,
+                page=target_page
+            ).pack()
+
+        ))
+
+    if nav_row:
+        kb_builder.row(*nav_row)
+
+    return kb_builder
 
 @banner_router_for_admin.callback_query(F.data == 'banners')
 async def banners_menu(callback: types.CallbackQuery, session: AsyncSession):
@@ -51,7 +134,7 @@ async def banners_menu(callback: types.CallbackQuery, session: AsyncSession):
 async def cmd_show_banners(callback: types.CallbackQuery, session: AsyncSession, state: FSMContext):
     # 1. Запрос к БД
     banners = await orm_get_banners(session)
-    
+
     if not banners:
         await callback.answer()
         return await callback.message.answer('Баннеры еще не добавлены.')
@@ -106,8 +189,6 @@ async def edit_banner(
     )
 
     await callback.answer()
-
-
 
 
 @banner_router_for_admin.message(AddBanner.image, F.photo)

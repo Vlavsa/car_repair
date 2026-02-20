@@ -7,6 +7,7 @@ from database.Paginator import Paginator
 from database.Banner import orm_get_banner
 from database.Category import orm_get_categories_inner_join_services, orm_get_categories, orm_get_categories_with_count_services
 from database.Service import orm_get_services_by_category_id
+from handlers.private_chat.query_admins.Banners import banner_menu
 from handlers.private_chat.query_admins.Category import category_menu
 from handlers.private_chat.query_admins.Service import services_menu
 from kbds.inline.main_menu import MenuCallBackAdmin, get_admin_main_btns, get_client_main_btns
@@ -56,13 +57,9 @@ async def settings_menu(session, level, menu_name):
                 level=target_level, menu_name=target_menu).pack()
         ))
 
-    print(headline)
     return headline, keyboard.adjust(2).as_markup()
 
 
-async def banner_menu(session, level, menu_name):
-    print('banner_menu')
-    print(menu_name, level)
 
 
 async def time_work_menu(session, level, menu_name):
@@ -82,7 +79,7 @@ async def distributor_menu(session, level, menu_name, category_id, banner_id, pa
     if menu_name == "category":
         return await category_menu(session=session, level=level, menu_name=menu_name, page=page)
     elif menu_name == "banner":
-        return await banner_menu(session, level, menu_name)
+        return await banner_menu(session, level, menu_name, page=page)
     elif menu_name == "time_work":
         return await time_work_menu(session, level, menu_name)
     else:

@@ -39,7 +39,7 @@ async def orm_update_service_by_id(session: AsyncSession, service_id: int, data)
     query = update(Service).where(Service.id == service_id).values(
         name=data["name"],
         description=data["description"],
-        price=float(data["price"].replace(",", ".")),
+        price=float(data["price"]),
         image=data["image"],
         category_id=int(data['category']))
     await session.execute(query)

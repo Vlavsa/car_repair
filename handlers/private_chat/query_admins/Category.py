@@ -58,10 +58,11 @@ async def category_menu(session, level, menu_name, page):
 
     if not categories:
         kb = InlineKeyboardBuilder()
-        kb.add(InlineKeyboardButton(
-            text='➕ Создать категорию', callback_data='add_category'))
         kb.add(InlineKeyboardButton(text='🔙 Назад', callback_data=MenuCallBackAdmin(
             level=level-1, menu_name='settings').pack()))
+        kb.add(InlineKeyboardButton(
+            text='➕ Создать категорию', callback_data='add_category'))
+
         return "📂 Список категорий пуст...", kb.adjust(1).as_markup()
 
     # Пагинация
@@ -91,10 +92,11 @@ async def category_menu(session, level, menu_name, page):
 
     # Добавляем общие кнопки управления меню
     kb_builder.row(
+        InlineKeyboardButton(text='🔙 Назад', callback_data=MenuCallBackAdmin(
+            level=level-1, menu_name='settings').pack()),
         InlineKeyboardButton(text='➕ Создать новую',
                              callback_data='add_category'),
-        InlineKeyboardButton(text='🔙 Назад', callback_data=MenuCallBackAdmin(
-            level=level-1, menu_name='settings').pack())
+
     )
     return headline, kb_builder.as_markup()
 
