@@ -64,7 +64,7 @@ async def services_menu(session, level, category, page):
     )
 
     pagination_btns = pages(paginator)
-    print(pagination_btns)
+    
     kbds = get_products_btns(
         level=level,
         category=category,

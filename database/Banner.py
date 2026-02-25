@@ -32,6 +32,12 @@ async def orm_update_banner_image(session: AsyncSession, banner_id: int, image):
     await session.commit()
 
 
+async def orm_get_banner_by_id(session: AsyncSession, banner_id: int):
+    query = select(Banner).where(Banner.id == banner_id)
+    result = await session.execute(query)
+    return result.scalar()
+
+
 async def orm_get_banner(session: AsyncSession, page: str):
     query = select(Banner).where(Banner.name == page)
     result = await session.execute(query)
@@ -48,3 +54,12 @@ async def orm_get_info_pages(session: AsyncSession):
     query = select(Banner)
     result = await session.execute(query)
     return result.scalars().all()
+
+
+async def orm_update_banner_by_id(session: AsyncSession, banner_id: int, data):
+    query = update(Banner).where(Banner.id == banner_id).values(
+        description=data["description"],
+        image=data["image"]
+    )
+    await session.execute(query)
+    await session.commit()

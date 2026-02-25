@@ -5,15 +5,11 @@ from sqlalchemy import select, update, delete
 
 from database.models import OrderStatuses
 
-async def orm_create_order_statuses(session: AsyncSession, name: str):
-    ...
-
-# Добавил свою модельку статусов заказов
-# # Может не заработать, т.к. скрипт написан под YQL
-#         await db.execute(f'''
-# CREATE TABLE IF NOT EXISTS OrderStatuses (
-# id uint64 NOT NULL,
-# code Utf8 NOT NULL,
-# name Utf8 NOT NULL,
-# PRIMARY KEY (id));''')
-#         await db.commit()
+# 0 «Новая», 
+# 1 «Согласование»,
+# 2 «В работе»,
+# 3 «Ожидание запчастей»,
+# 4 «Контроль качества»,
+# 5 «Готов к выдаче»,
+# 6 «Выдан»
+# 7 «Отменен»
