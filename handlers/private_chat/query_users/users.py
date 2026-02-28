@@ -77,14 +77,16 @@ async def get_phone(message: types.Message, state: FSMContext, session: AsyncSes
 
 @user_router.callback_query(MenuCallBack.filter())
 async def user_menu(callback: types.CallbackQuery, callback_data: MenuCallBack, session: AsyncSession, state: FSMContext):
-
+    
+    client_id = callback.from_user.id
     media, replay_markup = await get_menu_content(
         session,
         level=callback_data.level,
         menu_name=callback_data.menu_name,
         category=callback_data.category,
         page=callback_data.page,
-        state=state
+        state=state,
+        client_id=client_id 
     )
 
     try:

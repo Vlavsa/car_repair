@@ -16,7 +16,7 @@ def get_callback_btns(
     for text, data in btns.items():
         builder.add(InlineKeyboardButton(text=text, callback_data=data))
 
-    # При нажатии вернет callback_data
+
     return builder.adjust(*sizes).as_markup()
 
 
@@ -32,7 +32,7 @@ async def get_user_catalog_btns(*, level: int, categories: list, sizes: tuple[in
     text_basket = f"🛒 Корзина {count_services}"
 
     keyboard = InlineKeyboardBuilder()
-    keyboard.add(InlineKeyboardButton(text='Назад', callback_data=MenuCallBack(
+    keyboard.add(InlineKeyboardButton(text='🔙 Назад', callback_data=MenuCallBack(
         level=level-1, menu_name='main').pack()))
     keyboard.add(InlineKeyboardButton(
         text=text_basket, callback_data=MenuCallBack(level=3, menu_name='order').pack()))
@@ -58,7 +58,7 @@ def get_url_btns(
         builder.add(InlineKeyboardButton(text=text, url=url))
 
     builder.adjust(*sizes)
-    return builder.as_markup()  # При нажатии вернет url
+    return builder.as_markup()  
 
 
 def get_inlineMix_btns(
@@ -75,4 +75,4 @@ def get_inlineMix_btns(
             builder.add(InlineKeyboardButton(text=text, callback_data=value))
 
     builder.adjust(*sizes)
-    return builder.as_markup()  # При нажатии вернет url
+    return builder.as_markup()

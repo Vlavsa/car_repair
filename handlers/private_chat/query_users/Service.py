@@ -28,14 +28,13 @@ async def services_menu(session, level, category, page, state=None):
     elif page < 1:
         page = 1
 
-    # Пересоздаем с корректным числом
     paginator = Paginator(services, page)
 
     service = paginator.get_page()[0]
 
     caption = (
         f"🛠 <b>{service.name}</b>\n"
-        f"--------------------\n"  # Заменил подчеркивания на дефисы, чтобы не ломать Markdown
+        f"--------------------\n" 
         f"{service.description}\n\n"
         f"💰 Стоимость: <b>{round(service.price, 2)} ₽</b>\n"
         f"📦 Услуга {paginator.page} из {paginator.pages}"
@@ -48,8 +47,8 @@ async def services_menu(session, level, category, page, state=None):
 
     pagination_btns = pages(paginator)
 
-    # Внутри services_menu
-    kbds = await get_service_btns(  # Добавлен await
+
+    kbds = await get_service_btns(  
         level=level,
         category=category,
         page=page,
@@ -69,28 +68,35 @@ async def get_service_btns(
     pagination_btns: dict,
     service_id: int,
     sizes: tuple[int] = (2, 1),
-    state=None,  # Убрали тайпинг None, чтобы принимать объект состояния
+    state=None,  
 ):
-    # Логика изменения текста кнопки, если товар в корзине
-    select_text = "✅ Выбрать"
-    remuved_text = f"❌ Убрать"
-    menu_action = "add_to_order"
-    reduce_order = "reduce_from_order"
-    service_id = int(service_id)
+
+
 
 
 
     if state is not None:
         data = await state.get_data()
-        # Гарантируем, что работаем со списком нужного типа (int)
+
         cart_services = [int(i) for i in data.get("list_services", [])]
     else:
         cart_services = []
 
-    keyboard = InlineKeyboardBuilder()
-
     total_len = len(cart_services)
     count_services = f" ({total_len} шт.)" if total_len > 0 else ""
+
+    service_id = int(service_id)
+    select_text = "✅ Выбрать" if cart_services.count(service_id) == 0  else "✅ Добавить"
+    remuved_text = f"❌ Убрать"
+    menu_action = "add_to_order"
+    reduce_order = "reduce_from_order"
+    
+
+
+
+    keyboard = InlineKeyboardBuilder()
+
+
 
     keyboard.add(
         InlineKeyboardButton(text='🔙 Назад', callback_data=MenuCallBack(

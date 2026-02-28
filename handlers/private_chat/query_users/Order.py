@@ -10,7 +10,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 from database.Banner import orm_get_banner
 from database.Client import orm_check_client
-from database.Orders import orm_add_to_order, orm_delete_from_order, orm_get_orders_by_status
+from database.Orders import orm_add_to_order, orm_clear_order, orm_delete_from_order, orm_get_orders_by_status
 from filters.chat_types import ChatTypeFilter
 from handlers.private_chat.query_users.Service import services_menu
 from handlers.private_chat.query_users.state import AddClient
@@ -25,25 +25,27 @@ order_user_router.message.filter(ChatTypeFilter(["private"]))
 
 
 async def order_menu(session, level, menu_name, state, client_id):
-    # Получаем заказы со статусом 1 (в корзине)
     orders = await orm_get_orders_by_status(session, client_id, status_id=1)
+    banner = await orm_get_banner(session, menu_name)
 
-    # Получаем баннер для корзины
-    banner = await orm_get_banner(session, menu_name)  # menu_name тут 'order'
+    data = await state.get_data()
+    cart_fsm = data.get("list_services", [])
 
-    if not orders:
-        # Если заказов в БД нет, проверяем FSM (на случай, если юзер не зарегистрирован)
-        data = await state.get_data()
-        if not data.get("list_services"):
-            return "🛒 <b>Ваша корзина пуста</b>", await get_client_main_btns(level=0, state=state)
+    if not orders and not cart_fsm:
+        text_lol = "🛒 <b>Ваша корзина пуста</b>"
+        kbds = await get_client_main_btns(level=0, state=state)
 
-    # Формируем текст чека
+        if banner and banner.image:
+            return InputMediaPhoto(media=banner.image, caption=text_lol, parse_mode="HTML"), kbds
+        return text_lol, kbds
+
     order_lines = []
     total_price = 0
 
-    # Проходим по всем заказам (обычно он один в статусе 1)
     for order in orders:
+        print(order.items)
         for item in order.items:
+
             item_sum = item.quantity * item.price_at_runtime
             total_price += item_sum
             order_lines.append(
@@ -58,7 +60,6 @@ async def order_menu(session, level, menu_name, state, client_id):
         f"💰 Итого к оплате: <b>{round(total_price, 2)} ₽</b>"
     )
 
-    # Получаем кнопки для корзины (Оформить, Очистить, Назад)
     kbds = await get_order_btns(level=level, state=state, client_id=client_id)
 
     if banner and banner.image:
@@ -78,13 +79,10 @@ async def get_order_btns(
 ):
     keyboard = InlineKeyboardBuilder()
 
-    # Проверяем, есть ли что-то в корзине через state
-    # (чтобы не показывать кнопку "Оформить", если пусто)
     data = await state.get_data() if state else {}
     cart_services = data.get("list_services", [])
 
     if cart_services:
-        # Кнопка оформления заказа
         keyboard.add(
             InlineKeyboardButton(
                 text="✅ Оформить заказ",
@@ -92,7 +90,6 @@ async def get_order_btns(
                     level=level + 1, menu_name="checkout").pack()
             )
         )
-        # Кнопка очистки
         keyboard.add(
             InlineKeyboardButton(
                 text="🗑 Очистить корзину",
@@ -101,7 +98,6 @@ async def get_order_btns(
             )
         )
 
-    # Кнопка возврата в каталог
     keyboard.add(
         InlineKeyboardButton(
             text="🔙 В каталог",
@@ -110,6 +106,37 @@ async def get_order_btns(
     )
 
     return keyboard.adjust(*sizes).as_markup()
+
+
+@order_user_router.callback_query(MenuCallBack.filter(F.menu_name == "clear_cart"))
+async def clear_cart_handler(callback: types.CallbackQuery, callback_data: MenuCallBack, state: FSMContext, session: AsyncSession):
+    user_tg_id = callback.from_user.id
+
+    await orm_clear_order(session, client_id=user_tg_id, status_id=1)
+
+    await state.update_data(list_services=[])
+
+    from handlers.private_chat.query_users.menu_processing import get_menu_content
+
+    media, replay_markup = await get_menu_content(
+        session,
+        level=callback_data.level,
+        menu_name="order",
+        state=state,
+        client_id=user_tg_id
+    )
+
+    try:
+        if isinstance(media, types.InputMediaPhoto):
+            await callback.message.edit_media(media=media, reply_markup=replay_markup)
+        else:
+
+            await callback.message.answer(text=str(media), reply_markup=replay_markup)
+            await callback.message.delete()
+    except Exception:
+        pass
+
+    await callback.answer("Корзина очищена 🗑")
 
 
 @order_user_router.callback_query(MenuCallBack.filter(F.menu_name == "add_to_order"))
@@ -136,7 +163,6 @@ async def add_to_order(callback: types.CallbackQuery, state: FSMContext, callbac
         )
         await state.update_data(list_services=list_services)
 
-        # Рекомендуется вызывать services_menu, чтобы пользователь остался на странице товара
         image, kbds = await services_menu(
             session=session,
             level=callback_data.level,
@@ -191,7 +217,7 @@ async def reduce_from_order(callback: types.CallbackQuery, callback_data: MenuCa
     try:
         await callback.message.edit_media(media=image, reply_markup=kbds)
     except Exception:
-        # На случай, если пользователь нажал очень быстро и контент не изменился
+
         pass
 
     await callback.answer("Удалено из корзины ❌")

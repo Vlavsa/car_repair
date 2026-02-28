@@ -16,55 +16,39 @@ from kbds.inline.inline import get_user_catalog_btns
 
 
 async def check_image_for_menu(
-        message: types.Message,
-        session: AsyncSession,
-        state: FSMContext,
-        menu_name: str = "main",
-        client_id: int | None = None,
+    message: types.Message,
+    session: AsyncSession,
+    state: FSMContext,
+    menu_name: str = "main",
+    client_id: int | None = None,
 ):
     if client_id is None:
         client_id = message.from_user.id
 
-    if state is not None:
-        data = await state.get_data()
-        # Гарантируем, что работаем со списком нужного типа (int)
-        cart_services = [int(i) for i in data.get("list_services", [])]
-    else:
-        cart_services = []
+    # 1. Получаем текущие заказы из БД ОДИН РАЗ
     orders = await orm_get_orders_by_status(session, client_id, status_id=1)
-    print()
-    print()
+    
+    # 2. Формируем актуальный список услуг из БД
     db_services = []
     if orders:
         for order in orders:
             for item in order.items:
-                # Добавляем ID услуги столько раз, сколько указано в количестве (quantity)
                 db_services.extend([int(item.service_id)] * item.quantity)
-    print(db_services)
-    if set(cart_services) != set(db_services) or len(cart_services) != len(db_services):
-        print(
-            f"Синхронизация: FSM ({len(cart_services)}) != DB ({len(db_services)})")
-        await state.update_data(list_services=db_services)
-        cart_services = db_services
 
-    # Передаем все аргументы в контент
+    # 3. Синхронизируем FSM
+    data = await state.get_data()
+    cart_services = [int(i) for i in data.get("list_services", [])]
+
+    if cart_services != db_services:
+        print(f"Синхронизация FSM с БД для пользователя {client_id}")
+        await state.update_data(list_services=db_services)
+
+    # 4. Получаем контент меню
     media, replay_markup = await get_menu_content(
         session, level=0, menu_name=menu_name, client_id=client_id, state=state
     )
 
-    # Синхронизация: подгружаем заказы из БД и обновляем FSM
-    orders = await orm_get_orders_by_status(session=session, client_id=client_id, status_id=1)
-
-    if orders:
-        # Собираем список ID услуг из всех айтемов заказа
-        list_services = []
-        for order in orders:
-            for item in order.items:
-                # Добавляем ID столько раз, сколько указано в quantity
-                list_services.extend([item.service_id] * item.quantity)
-
-        await state.update_data(list_services=list_services)
-
+    # 5. Отправка пользователю
     if isinstance(media, types.InputMediaPhoto):
         await message.answer_photo(
             photo=media.media,
@@ -73,9 +57,10 @@ async def check_image_for_menu(
             parse_mode="HTML"
         )
     else:
-        # Если media вернула баннер без фото (текстовый объект)
+        # Если баннер не найден или это текст
+        caption = media.description if hasattr(media, 'description') else "Меню"
         await message.answer(
-            text=f"🛠 <b>{media.name}</b>\n\n{media.description}",
+            text=caption,
             reply_markup=replay_markup,
             parse_mode="HTML"
         )
