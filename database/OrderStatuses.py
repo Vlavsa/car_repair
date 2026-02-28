@@ -6,7 +6,7 @@ from sqlalchemy import select, update, delete
 from database.models import OrderStatuses
 
 async def orm_create_initial_data(session: AsyncSession):
-    # Проверяем, есть ли уже статусы
+
     query = select(OrderStatuses).where(OrderStatuses.id == 1)
     result = await session.execute(query)
     

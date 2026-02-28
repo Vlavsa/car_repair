@@ -1,11 +1,13 @@
 from datetime import datetime
 
+from aiogram.types import InlineKeyboardButton, InputMediaPhoto
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import DateTime, String, Text, Float, func, Numeric, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, joinedload, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
 
-from database.Service import orm_get_service_prices_by_id
+from database.Banner import orm_get_banner
 from database.models import Base, Order, OrderItem, Service
 
 
@@ -89,6 +91,27 @@ async def orm_reduce_service_in_order(session: AsyncSession, client_id: int, ser
         await session.delete(item)
         await session.commit()
         return False
+
+
+async def orm_get_orders_by_status(session: AsyncSession, client_id: int, status_id: int = 1):
+
+    query = (
+        select(Order)
+        .where(
+            Order.client_id == client_id,
+            Order.status_id == status_id
+        )
+        .options(
+            # Загружаем список товаров в заказе и связанные с ними услуги
+            selectinload(Order.items).joinedload(OrderItem.service),
+            # Загружаем объект статуса
+            joinedload(Order.status)
+        )
+    )
+
+    result = await session.execute(query)
+    # Используем .unique(), так как используем join/selectinload для коллекций
+    return result.scalars().unique().all()
 
 
 async def orm_get_user_orders(session: AsyncSession, client_id: int):

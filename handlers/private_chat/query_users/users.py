@@ -23,17 +23,12 @@ user_router = Router()
 user_router.message.filter(ChatTypeFilter(["private"]))
 
 
-user_router.include_routers(
-    order_user_router
-)
-
-
 @user_router.message(CommandStart())
 async def start_cmd(message: types.Message, state: FSMContext, session: AsyncSession):
     user = await orm_check_client(session=session, client_id=message.from_user.id)
 
     if user:
-        await check_image_for_menu(message=message, session=session)
+        await check_image_for_menu(message=message, session=session, menu_name="main", client_id=message.from_user.id, state=state)
     else:
         kb = ReplyKeyboardBuilder()
         kb.add(types.KeyboardButton(
@@ -80,7 +75,7 @@ async def get_phone(message: types.Message, state: FSMContext, session: AsyncSes
     await check_image_for_menu(message=message, session=session)
 
 
-@user_router.callback_query(MenuCallBack.filter(~F.menu_name.in_(["add_to_order", "reduce_from_order"])))
+@user_router.callback_query(MenuCallBack.filter())
 async def user_menu(callback: types.CallbackQuery, callback_data: MenuCallBack, session: AsyncSession, state: FSMContext):
 
     media, replay_markup = await get_menu_content(

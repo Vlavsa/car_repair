@@ -23,7 +23,7 @@ description_for_info_pages = {
         sep="\n----------------------\n",
     ).as_html(),
     'catalog': 'Категории:',
-    'order': 'В корзине ничего нет!'
+    'order': 'Ваша корзина'
 }
 
 

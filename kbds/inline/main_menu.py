@@ -2,6 +2,8 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import InlineKeyboardButton
 
+from database.Orders import orm_get_orders_by_status
+
 
 class MenuCallBackAdmin(CallbackData, prefix="admin_menu"):
     level: int
@@ -20,15 +22,27 @@ class MenuCallBack(CallbackData, prefix="menu"):
     service_id: int | None = None
 
 
-def get_client_main_btns(
+async def get_client_main_btns(
         *,
         level: int,
         sizes: tuple[int] = (2,),
+        state = None
 ):
+    
+    if state is not None:
+        data = await state.get_data()
+        cart_services = [int(i) for i in data.get("list_services", [])]
+    else:
+        cart_services = []
+    total_len = len(cart_services)
+    count_services = f" ({total_len} шт.)" if total_len > 0 else ""
+    text_basket = f"🛒 Корзина {count_services}"
+
+
     keyboard = InlineKeyboardBuilder()
     btns = {
         "📂 Каталог": "catalog",
-        "🛒 Корзина": "order",
+        text_basket: "order",
         "ℹ️ О нас": "about",
         "💳 Оплата": "payment",
     }

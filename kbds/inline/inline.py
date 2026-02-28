@@ -20,13 +20,22 @@ def get_callback_btns(
     return builder.adjust(*sizes).as_markup()
 
 
-def get_user_catalog_btns(*, level: int, categories: list, sizes: tuple[int] = (2,),):
-    keyboard = InlineKeyboardBuilder()
+async def get_user_catalog_btns(*, level: int, categories: list, sizes: tuple[int] = (2,), state=None):
 
+    if state is not None:
+        data = await state.get_data()
+        cart_services = [int(i) for i in data.get("list_services", [])]
+    else:
+        cart_services = []
+    total_len = len(cart_services)
+    count_services = f" ({total_len} шт.)" if total_len > 0 else ""
+    text_basket = f"🛒 Корзина {count_services}"
+
+    keyboard = InlineKeyboardBuilder()
     keyboard.add(InlineKeyboardButton(text='Назад', callback_data=MenuCallBack(
         level=level-1, menu_name='main').pack()))
     keyboard.add(InlineKeyboardButton(
-        text='Корзина', callback_data=MenuCallBack(level=3, menu_name='order').pack()))
+        text=text_basket, callback_data=MenuCallBack(level=3, menu_name='order').pack()))
 
     if not categories:
         return keyboard.adjust(*sizes).as_markup()
@@ -36,8 +45,6 @@ def get_user_catalog_btns(*, level: int, categories: list, sizes: tuple[int] = (
             level=level+1, menu_name=cat.name, category=cat.id).pack()))
 
     return keyboard.adjust(*sizes).as_markup()
-
-
 
 
 def get_url_btns(
@@ -69,5 +76,3 @@ def get_inlineMix_btns(
 
     builder.adjust(*sizes)
     return builder.as_markup()  # При нажатии вернет url
-
-

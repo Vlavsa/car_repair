@@ -17,6 +17,7 @@ from database.engine import create_db, drop_db, session_maker
 
 
 from handlers.private_chat.query_users.users import user_router
+from handlers.private_chat.query_users.Order import order_user_router
 from handlers.group_chat.users import user_group_router
 from handlers.private_chat.query_admins.admins import admin_router
 
@@ -45,9 +46,13 @@ dp = Dispatcher()
 # Сначала подключаем узкоспециализированные роутеры
 dp.include_router(time_work_router_for_admin)
 
-dp.include_router(user_router)
-dp.include_router(user_group_router)
-dp.include_router(admin_router)
+
+dp.include_routers(
+    order_user_router,
+    user_router,
+    user_group_router,
+    admin_router,
+)
 
 
 async def on_startup():
