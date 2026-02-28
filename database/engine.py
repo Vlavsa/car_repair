@@ -1,6 +1,8 @@
+from sqlalchemy import text
 import os
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from database.OrderStatuses import orm_create_initial_data
 from database.models import Base
 from database.Category import orm_create_categories
 from database.Banner import orm_add_banner_description
@@ -30,15 +32,16 @@ async def create_db():
 
     async with session_maker() as session:
         await orm_create_categories(session, categories)
-        await orm_add_banner_description(session, description_for_info_pages) ## Добавляем страницы баннеров
+        await orm_create_initial_data(session)
+        # Добавляем страницы баннеров
+        await orm_add_banner_description(session, description_for_info_pages)
 
 
-# async def drop_db():
-#     async with engine.begin() as conn:
-#         await conn.run_sync(Base.metadata.drop_all)
 
+    # async def drop_db():
+    #     async with engine.begin() as conn:
+    #         await conn.run_sync(Base.metadata.drop_all)
 
-from sqlalchemy import text
 
 async def drop_db():
     async with engine.begin() as conn:
@@ -47,7 +50,7 @@ async def drop_db():
             "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
         ))
         tables = result.scalars().all()
-        
+
         if tables:
             # Склеиваем имена таблиц через запятую и добавляем CASCADE
             tables_str = ", ".join(tables)

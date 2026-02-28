@@ -1,8 +1,8 @@
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy import ForeignKey, Integer, String, Text, DateTime, Numeric
+from sqlalchemy import ForeignKey, BigInteger, Integer, String, Text, DateTime, Numeric, Date, Time, Boolean, UniqueConstraint, func, select, update, delete
 from typing import List, Optional
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, date, time
 
 from sqlalchemy import DateTime, String, Text, Float, func, Numeric, ForeignKey, BigInteger, Integer
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, joinedload
@@ -92,7 +92,7 @@ class OrderStatuses(Base):
     __tablename__ = 'statusorders'
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(15), unique=True)
+    name: Mapped[str] = mapped_column(String(30), unique=True)
     orders: Mapped[List["Order"]] = relationship(back_populates="status")
 
 
@@ -103,3 +103,20 @@ class Banner(Base):
     name: Mapped[str] = mapped_column(String(15), unique=True)
     image: Mapped[Optional[str]] = mapped_column(String(150))
     description: Mapped[Optional[str]] = mapped_column(Text)
+
+
+class TimeSlot(Base):
+    __tablename__ = 'time_slots'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    time_start: Mapped[time] = mapped_column(Time, nullable=False)
+    is_booked: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Связь с заказом, если слот уже занят
+    order_id: Mapped[Optional[int]] = mapped_column(ForeignKey('orders.id'))
+
+
+    __table_args__ = (
+        UniqueConstraint('date', 'time_start', name='uq_date_time_slots'),
+    )

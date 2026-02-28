@@ -16,6 +16,13 @@ user_group_router.edited_message.filter(
     ChatTypeFilter(['group', 'supergroup']))
 
 
+async def get_admin_ids(bot: Bot, chat_id: int):
+    admins = await bot.get_chat_administrators(chat_id)
+    # Исключаем ботов, берем только ID пользователей
+    return [admin.user.id for admin in admins if not admin.user.is_bot]
+
+
+
 @user_group_router.message(Command("admin"))
 async def get_admins(message: types.Message, bot: Bot):
     chat_id = message.chat.id

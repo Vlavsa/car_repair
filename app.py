@@ -36,7 +36,14 @@ bot = Bot(token=API_TOKEN, default=DefaultBotProperties(
     parse_mode=ParseMode.HTML))
 bot.my_admins_list = []
 
+from handlers.private_chat.query_admins.Time_work import time_work_router_for_admin
+
+# ... остальной код ...
+
 dp = Dispatcher() 
+
+# Сначала подключаем узкоспециализированные роутеры
+dp.include_router(time_work_router_for_admin)
 
 dp.include_router(user_router)
 dp.include_router(user_group_router)
@@ -56,7 +63,6 @@ async def main():
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
-    # dp.update.middleware(CleanUpMiddleware()) # Требует доработки
     
     dp.update.middleware(DataBaseSession(session_pool=session_maker))
     await bot.delete_webhook(drop_pending_updates=True)

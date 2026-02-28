@@ -5,11 +5,21 @@ from sqlalchemy import select, update, delete
 
 from database.models import OrderStatuses
 
-# 0 «Новая», 
-# 1 «Согласование»,
-# 2 «В работе»,
-# 3 «Ожидание запчастей»,
-# 4 «Контроль качества»,
-# 5 «Готов к выдаче»,
-# 6 «Выдан»
-# 7 «Отменен»
+async def orm_create_initial_data(session: AsyncSession):
+    # Проверяем, есть ли уже статусы
+    query = select(OrderStatuses).where(OrderStatuses.id == 1)
+    result = await session.execute(query)
+    
+    if not result.scalar():
+        # Добавляем базовые статусы
+        session.add_all([
+            OrderStatuses(id=1, name='В корзине'),
+            OrderStatuses(id=2, name='Оформлен'),
+            OrderStatuses(id=3, name='В работе'),
+            OrderStatuses(id=4, name='Ожидание запчастей'),
+            OrderStatuses(id=5, name='Готов к выдаче'),
+            OrderStatuses(id=6, name='Выполнено'),
+            OrderStatuses(id=7, name='Отмена'),
+        ])
+        await session.commit()
+

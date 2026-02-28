@@ -17,7 +17,7 @@ class MenuCallBack(CallbackData, prefix="menu"):
     menu_name: str
     category: int | None = None
     page: int | None = 1
-    product_id: int | None = None
+    service_id: int | None = None
 
 
 def get_client_main_btns(
@@ -27,10 +27,10 @@ def get_client_main_btns(
 ):
     keyboard = InlineKeyboardBuilder()
     btns = {
-        "Каталог ": "catalog",
-        "Корзина": "order",
-        "О нас": "about",
-        "Оплата": "payment",
+        "📂 Каталог": "catalog",
+        "🛒 Корзина": "order",
+        "ℹ️ О нас": "about",
+        "💳 Оплата": "payment",
     }
     for text, menu_name in btns.items():
         if menu_name == 'catalog':
