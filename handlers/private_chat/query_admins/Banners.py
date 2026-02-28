@@ -3,18 +3,16 @@ from aiogram import F, Router, types
 
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.filters import Command, StateFilter, or_f
+from aiogram.filters import or_f
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
-from callback.banner_admins_btns import BannerClick
 from database.Paginator import Paginator, pages
 from handlers.private_chat.query_admins.Service import edit_smart
-from kbds.inline.inline import get_callback_btns
+
 from kbds.inline.main_menu import MenuCallBackAdmin
-from kbds.reply import get_keyboard, ADMIN_KB
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,8 +28,6 @@ from database.Banner import (
     orm_update_banner_by_id,
     orm_update_banner_image
 )
-
-from kbds.inline.inline import button_banner_admin
 
 
 banner_router_for_admin = Router()
@@ -133,7 +129,6 @@ async def get_banners_btns(
 async def start_update_banners(callback: types.CallbackQuery, callback_data: ClickBanner, session: AsyncSession, state: FSMContext):
     banner_id = callback_data.banner_id
     banner = await orm_get_banner_by_id(session=session, banner_id=banner_id)
-
 
     await state.update_data(
         msg_to_edit=callback.message.message_id,

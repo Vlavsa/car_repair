@@ -2,16 +2,14 @@ from aiogram import F, Router, types
 
 from aiogram.types import InlineKeyboardButton
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.filters import Command, StateFilter, or_f
+from aiogram.filters import or_f
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
 from database.Paginator import Paginator, pages
-from kbds.inline.categories_admin import CategoryClick, get_paginated_categories_kb
 from kbds.inline.main_menu import MenuCallBackAdmin
-from kbds.reply import ADMIN_KB
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,9 +25,6 @@ from database.Category import (
     orm_get_category,
     orm_update_category,
 )
-
-
-from kbds.inline.inline import get_callback_btns, button_categories_admin, button_settings_admin, buttons_start_admin
 
 
 category_router_for_admin = Router()

@@ -11,9 +11,6 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
 from database.Paginator import Paginator, pages
-from handlers.private_chat.query_admins.Category import category_menu
-from kbds.inline.categories_admin import CategoryClick
-from kbds.inline.inline import get_callback_btns, button_service_admin, button_categories_admin
 from kbds.inline.main_menu import MenuCallBackAdmin
 from kbds.reply import ADMIN_KB
 

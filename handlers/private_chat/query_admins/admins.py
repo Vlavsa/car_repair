@@ -3,31 +3,25 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, StateFilter, or_f
 from aiogram.fsm.context import FSMContext
 
+from aiogram import Bot, Dispatcher, types
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from handlers.private_chat.query_admins.Service import service_router_for_admin
 from handlers.private_chat.query_admins.Banners import banner_router_for_admin
 from handlers.private_chat.query_admins.Category import category_router_for_admin
+from handlers.private_chat.query_admins.Time_work import time_work_router_for_admin
+
 
 from filters.chat_types import ChatTypeFilter, IsAdmin
 
 from handlers.private_chat.query_admins.menu_processing import get_menu_content_for_admin, check_image_for_menu
-from kbds.inline.inline import get_callback_btns, button_categories_admin, button_settings_admin, buttons_start_admin
 from kbds.inline.main_menu import MenuCallBackAdmin
-from kbds.reply import get_keyboard
-from middlewares.cleanOnStart import CleanOnStartMiddleware
 
 admin_router = Router()
 admin_router.message.filter(ChatTypeFilter(["private"]), IsAdmin())
 
 
-# admin_router.callback_query.middleware(CleanOnStartMiddleware()) # ??????????????????????????
-
-
-# @admin_router.message(Command("admin"))
-# async def get_main_menu_admins(message: types.Message):
-#     return await message.answer(text="Главное меню админа:", reply_markup=buttons_start_admin)
 
 @admin_router.message(Command("admin"))
 async def start_admin_menu(message: types.Message, session: AsyncSession, menu_name: str = "main"):
@@ -82,4 +76,7 @@ admin_router.include_routers(
     banner_router_for_admin,
     category_router_for_admin,
     service_router_for_admin,
+    # time_work_router_for_admin,
 )
+
+
