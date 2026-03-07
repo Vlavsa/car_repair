@@ -34,7 +34,7 @@ async def services_menu(session, level, category, page, state=None):
 
     caption = (
         f"🛠 <b>{service.name}</b>\n"
-        f"--------------------\n" 
+        f"--------------------\n"
         f"{service.description}\n\n"
         f"💰 Стоимость: <b>{round(service.price, 2)} ₽</b>\n"
         f"📦 Услуга {paginator.page} из {paginator.pages}"
@@ -47,8 +47,7 @@ async def services_menu(session, level, category, page, state=None):
 
     pagination_btns = pages(paginator)
 
-
-    kbds = await get_service_btns(  
+    kbds = await get_service_btns(
         level=level,
         category=category,
         page=page,
@@ -68,12 +67,8 @@ async def get_service_btns(
     pagination_btns: dict,
     service_id: int,
     sizes: tuple[int] = (2, 1),
-    state=None,  
+    state=None,
 ):
-
-
-
-
 
     if state is not None:
         data = await state.get_data()
@@ -86,17 +81,13 @@ async def get_service_btns(
     count_services = f" ({total_len} шт.)" if total_len > 0 else ""
 
     service_id = int(service_id)
-    select_text = "✅ Выбрать" if cart_services.count(service_id) == 0  else "✅ Добавить"
+    select_text = "✅ Выбрать" if cart_services.count(
+        service_id) == 0 else "✅ Добавить"
     remuved_text = f"❌ Убрать"
     menu_action = "add_to_order"
     reduce_order = "reduce_from_order"
-    
-
-
 
     keyboard = InlineKeyboardBuilder()
-
-
 
     keyboard.add(
         InlineKeyboardButton(text='🔙 Назад', callback_data=MenuCallBack(

@@ -20,6 +20,7 @@ class MenuCallBack(CallbackData, prefix="menu"):
     category: int | None = None
     page: int | None = 1
     service_id: int | None = None
+    date: str | None = None
 
 
 async def get_client_main_btns(

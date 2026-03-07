@@ -1,6 +1,6 @@
 from datetime import datetime
 from datetime import date, time, timedelta
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, select, update, and_, or_
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy import DateTime, String, Text, Float, func, Numeric, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, joinedload, selectinload
@@ -87,3 +87,29 @@ async def orm_delete_all_free_slots(session: AsyncSession):
     query = delete(TimeSlot).where(TimeSlot.is_booked == False)
     await session.execute(query)
     await session.commit()
+
+
+
+async def orm_get_slots_by_date(session: AsyncSession, date_str: str):
+    # 1. Преобразуем строку "DD.MM.YYYY" в объект date
+    target_date = datetime.strptime(date_str, "%d.%m.%Y").date()
+    current_date = datetime.now().date()
+    current_time = datetime.now().time()
+
+    # 2. Базовый запрос: свободные слоты на выбранную дату
+    query = select(TimeSlot).where(
+        and_(
+            TimeSlot.date == target_date,
+            TimeSlot.is_booked == False
+        )
+    ).order_by(TimeSlot.time_start)
+
+    result = await session.execute(query)
+    slots = result.scalars().all()
+
+    # 3. Если выбрана сегодняшняя дата, убираем прошедшее время
+    if target_date == current_date:
+        # Оставляем только те слоты, время которых позже текущего
+        slots = [s for s in slots if s.time_start > current_time]
+
+    return slots

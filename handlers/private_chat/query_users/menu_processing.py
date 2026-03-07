@@ -99,7 +99,7 @@ async def get_menu_content(
         level: int,
         menu_name: str,
         category: int | None = None,
-        page: int | None = None,
+        page: int | None = 1,
         state: FSMContext | None = None,
         client_id: int | None = None
 ):
@@ -111,4 +111,7 @@ async def get_menu_content(
     elif level == 2:
         return await services_menu(session, level, category, page, state=state)
     elif level == 3:
-        return await order_menu(session, level, menu_name, state, client_id)
+        return await order_menu(session, level, menu_name, client_id, category, page, state)
+
+
+    return await main_menu(session, 0, "main", state=state)

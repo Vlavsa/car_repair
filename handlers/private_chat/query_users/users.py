@@ -16,12 +16,12 @@ from filters.chat_types import ChatTypeFilter
 from kbds.inline.main_menu import MenuCallBack
 
 from handlers.private_chat.query_users.menu_processing import check_image_for_menu, get_menu_content
-from handlers.private_chat.query_users.Order import order_user_router
 from handlers.private_chat.query_users.state import AddClient
+from handlers.private_chat.query_users.Order import order_for_user_router
 
 user_router = Router()
 user_router.message.filter(ChatTypeFilter(["private"]))
-
+user_router.include_routers(order_for_user_router)
 
 @user_router.message(CommandStart())
 async def start_cmd(message: types.Message, state: FSMContext, session: AsyncSession):
@@ -77,7 +77,7 @@ async def get_phone(message: types.Message, state: FSMContext, session: AsyncSes
 
 @user_router.callback_query(MenuCallBack.filter())
 async def user_menu(callback: types.CallbackQuery, callback_data: MenuCallBack, session: AsyncSession, state: FSMContext):
-    
+
     client_id = callback.from_user.id
     media, replay_markup = await get_menu_content(
         session,
@@ -86,7 +86,7 @@ async def user_menu(callback: types.CallbackQuery, callback_data: MenuCallBack, 
         category=callback_data.category,
         page=callback_data.page,
         state=state,
-        client_id=client_id 
+        client_id=client_id
     )
 
     try:
