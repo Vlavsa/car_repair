@@ -37,6 +37,7 @@ bot = Bot(token=API_TOKEN, default=DefaultBotProperties(
 bot.my_admins_list = []
 
 from handlers.private_chat.query_admins.Time_work import time_work_router_for_admin
+from handlers.private_chat.query_users.Order import order_for_user_router
 
 # ... остальной код ...
 
@@ -47,6 +48,7 @@ dp.include_router(time_work_router_for_admin)
 
 
 dp.include_routers(
+    order_for_user_router,
     user_router,
     user_group_router,
     admin_router,

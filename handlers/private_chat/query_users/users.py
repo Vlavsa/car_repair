@@ -17,11 +17,11 @@ from kbds.inline.main_menu import MenuCallBack
 
 from handlers.private_chat.query_users.menu_processing import check_image_for_menu, get_menu_content
 from handlers.private_chat.query_users.state import AddClient
-from handlers.private_chat.query_users.Order import order_for_user_router
+
 
 user_router = Router()
 user_router.message.filter(ChatTypeFilter(["private"]))
-user_router.include_routers(order_for_user_router)
+
 
 @user_router.message(CommandStart())
 async def start_cmd(message: types.Message, state: FSMContext, session: AsyncSession):
